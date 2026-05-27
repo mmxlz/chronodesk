@@ -52,24 +52,6 @@ export default function MemoryCard() {
         </div>
       </div>
 
-      {swapTotal > 0 && (
-        <div>
-          <div className="flex justify-between text-[10px] text-text-secondary mb-1">
-            <span>虚拟内存</span>
-            <span>{swapPercent}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-border overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${swapPercent}%`,
-                backgroundColor: swapPercent > 80 ? 'var(--color-warning)' : 'var(--color-primary)'
-              }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* History sparkline */}
       <div className="flex items-end gap-px h-6">
         {memoryHistory.slice(-40).map((p, i) => (
