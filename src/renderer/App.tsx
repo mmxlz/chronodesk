@@ -7,6 +7,7 @@ import { useSettingsStore, ViewId } from '@/store/settings-store'
 import { usePomodoroStore } from '@/store/pomodoro-store'
 import { useNotesStore } from '@/store/notes-store'
 import { getTheme } from '@/themes'
+import { formatDate } from '@/lib/formatters'
 import { playSound } from '@/lib/sounds'
 import { useSystemStats } from '@/features/monitor/useSystemStats'
 
@@ -175,9 +176,15 @@ export default function App() {
 
 // Inline mini clock component
 function MiniClock() {
+  const currentTheme = useThemeStore((s) => s.currentTheme)
   const clockColor = useThemeStore((s) => s.clockColor)
+  const clockFont = useThemeStore((s) => s.clockFont)
   const clockFormat = useThemeStore((s) => s.clockFormat)
+  const clockSize = useThemeStore((s) => s.clockSize)
   const showSeconds = useThemeStore((s) => s.showSeconds)
+  const showDate = useThemeStore((s) => s.showDate)
+
+  const theme = getTheme(currentTheme)
 
   const [time, setTime] = useState(new Date())
 
@@ -194,20 +201,36 @@ function MiniClock() {
   const m = time.getMinutes().toString().padStart(2, '0')
   const s = time.getSeconds().toString().padStart(2, '0')
 
+  const fontFamily = clockFont || theme.clockFont
+
+  const sizeMap: Record<string, string> = {
+    small: 'text-3xl',
+    medium: 'text-5xl',
+    large: 'text-7xl',
+    xlarge: 'text-[8rem]'
+  }
+
   return (
-    <div
-      className="text-6xl font-bold cursor-pointer select-none"
-      style={{
-        fontFamily: 'JetBrains Mono',
-        color: clockColor || undefined
-      }}
-    >
-      {h}:{m}
-      {showSeconds && (
-        <>
-          <span className="animate-blink">:</span>
-          {s}
-        </>
+    <div className="flex flex-col items-center gap-2">
+      <div
+        className={`${sizeMap[clockSize]} font-bold tracking-tight leading-none cursor-pointer select-none`}
+        style={{
+          fontFamily,
+          color: clockColor || undefined
+        }}
+      >
+        <span>{h}</span>
+        <span className="animate-blink">:</span>
+        <span>{m}</span>
+        {showSeconds && (
+          <>
+            <span className="animate-blink">:</span>
+            <span>{s}</span>
+          </>
+        )}
+      </div>
+      {showDate && (
+        <div className="text-sm text-text-secondary">{formatDate(time)}</div>
       )}
     </div>
   )
