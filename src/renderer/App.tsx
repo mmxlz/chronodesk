@@ -28,14 +28,16 @@ function getBackgroundStyle(
 function getImageBgStyle(
   bgImage: string,
   bgImageSize: BgImageSize,
-  bgImageBlur: number
+  bgImageBlur: number,
+  bgImageX: number,
+  bgImageY: number
 ): React.CSSProperties | null {
   if (!bgImage) return null
   const size = typeof bgImageSize === 'number' ? `${bgImageSize}%` : bgImageSize
   return {
     backgroundImage: `url(${bgImage})`,
     backgroundSize: size,
-    backgroundPosition: 'center',
+    backgroundPosition: `${bgImageX}% ${bgImageY}%`,
     filter: bgImageBlur > 0 ? `blur(${bgImageBlur}px)` : undefined
   }
 }
@@ -50,6 +52,8 @@ export default function App() {
   const bgImage = useThemeStore((s) => s.bgImage)
   const bgImageSize = useThemeStore((s) => s.bgImageSize)
   const bgImageBlur = useThemeStore((s) => s.bgImageBlur)
+  const bgImageX = useThemeStore((s) => s.bgImageX)
+  const bgImageY = useThemeStore((s) => s.bgImageY)
   const miniMode = useSettingsStore((s) => s.miniMode)
   const setSelectedView = useSettingsStore((s) => s.setSelectedView)
   const toggleMiniMode = useSettingsStore((s) => s.toggleMiniMode)
@@ -71,8 +75,8 @@ export default function App() {
     [bgType, bgColor, bgGradient]
   )
   const imageBgStyle = useMemo(
-    () => bgType === 'image' ? getImageBgStyle(bgImage, bgImageSize, bgImageBlur) : null,
-    [bgType, bgImage, bgImageSize, bgImageBlur]
+    () => bgType === 'image' ? getImageBgStyle(bgImage, bgImageSize, bgImageBlur, bgImageX, bgImageY) : null,
+    [bgType, bgImage, bgImageSize, bgImageBlur, bgImageX, bgImageY]
   )
 
   // Hydrate stores from electron-store on mount

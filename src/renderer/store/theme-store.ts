@@ -30,6 +30,8 @@ interface ThemeState {
   bgImage: string
   bgImageSize: BgImageSize
   bgImageBlur: number
+  bgImageX: number
+  bgImageY: number
 
   // Clock customization
   clockFormat: ClockFormat
@@ -55,6 +57,8 @@ interface ThemeState {
   setBgImage: (i: string) => void
   setBgImageSize: (s: BgImageSize) => void
   setBgImageBlur: (b: number) => void
+  setBgImageX: (x: number) => void
+  setBgImageY: (y: number) => void
   setClockFormat: (f: ClockFormat) => void
   setShowSeconds: (v: boolean) => void
   setShowDate: (v: boolean) => void
@@ -79,6 +83,8 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   bgImage: '',
   bgImageSize: 100,
   bgImageBlur: 0,
+  bgImageX: 50,
+  bgImageY: 50,
 
   clockFormat: '24h',
   showSeconds: true,
@@ -100,6 +106,8 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   setBgImage: (bgImage) => set({ bgImage }),
   setBgImageSize: (bgImageSize) => set({ bgImageSize }),
   setBgImageBlur: (bgImageBlur) => set({ bgImageBlur }),
+  setBgImageX: (bgImageX) => set({ bgImageX }),
+  setBgImageY: (bgImageY) => set({ bgImageY }),
   setClockFormat: (clockFormat) => set({ clockFormat }),
   setShowSeconds: (showSeconds) => set({ showSeconds }),
   setShowDate: (showDate) => set({ showDate }),

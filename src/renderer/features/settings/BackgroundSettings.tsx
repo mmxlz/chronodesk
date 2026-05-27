@@ -13,7 +13,7 @@ const gradients = [
 ]
 
 export default function BackgroundSettings() {
-  const { bgType, bgColor, bgGradient, bgImage, bgImageSize, bgImageBlur, setBgType, setBgColor, setBgGradient, setBgImage, setBgImageSize, setBgImageBlur } =
+  const { bgType, bgColor, bgGradient, bgImage, bgImageSize, bgImageBlur, bgImageX, bgImageY, setBgType, setBgColor, setBgGradient, setBgImage, setBgImageSize, setBgImageBlur, setBgImageX, setBgImageY } =
     useThemeStore()
 
   const handleImageUpload = () => {
@@ -183,6 +183,45 @@ export default function BackgroundSettings() {
                   onChange={(e) => setBgImageBlur(Number(e.target.value))}
                   className="w-full accent-accent"
                 />
+              </div>
+
+              {/* Image position */}
+              <div>
+                <label className="text-xs text-text-secondary block mb-1.5">图片位置</label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-text-secondary w-5">左右</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={bgImageX}
+                      onChange={(e) => setBgImageX(Number(e.target.value))}
+                      className="flex-1 accent-accent"
+                    />
+                    <span className="text-xs text-text-secondary w-8 text-right">{bgImageX}%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-text-secondary w-5">上下</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={bgImageY}
+                      onChange={(e) => setBgImageY(Number(e.target.value))}
+                      className="flex-1 accent-accent"
+                    />
+                    <span className="text-xs text-text-secondary w-8 text-right">{bgImageY}%</span>
+                  </div>
+                  <button
+                    onClick={() => { setBgImageX(50); setBgImageY(50) }}
+                    className="text-[10px] text-text-secondary hover:text-accent transition-colors"
+                  >
+                    居中重置
+                  </button>
+                </div>
               </div>
             </>
           )}
