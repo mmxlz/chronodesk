@@ -82,7 +82,7 @@ export default function CpuCard() {
       )}
 
       {/* History sparkline */}
-      <div className="flex items-end gap-px h-6">
+      <div className="flex items-end gap-px h-6 mt-auto">
         {cpuHistory.slice(-40).map((p, i) => (
           <div
             key={i}
