@@ -4,8 +4,10 @@ import { formatBytes } from '@/lib/formatters'
 
 export default function MemoryCard() {
   const current = useMonitorStore((s) => s.current)
+  const staticInfo = useMonitorStore((s) => s.staticInfo)
   const memoryHistory = useMonitorStore((s) => s.memoryHistory)
   const percentage = current?.memory.percentage ?? 0
+  const memSpeed = staticInfo?.memSpeed ?? null
   const active = current?.memory.active ?? 0
   const available = current?.memory.available ?? 0
   const total = current?.memory.total ?? 0
@@ -32,6 +34,12 @@ export default function MemoryCard() {
             <span className="text-text-secondary">可用</span>
             <div className="font-medium">{formatBytes(available)}</div>
           </div>
+          {memSpeed && (
+            <div>
+              <span className="text-text-secondary">频率</span>
+              <div className="font-medium">{memSpeed} MHz</div>
+            </div>
+          )}
           {swapTotal > 0 && (
             <div>
               <span className="text-text-secondary">虚拟内存</span>
