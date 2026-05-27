@@ -33,7 +33,8 @@ export interface SystemStats {
     vramUsed: number
     temperature: number | null
     load: number | null
-    fanSpeed: number | null
+    memControllerLoad: number | null
+    powerDraw: number | null
     coreClock: number | null
     memoryClock: number | null
   }>

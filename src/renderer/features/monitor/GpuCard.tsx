@@ -1,6 +1,5 @@
 import { useMonitorStore } from '@/store/monitor-store'
 import GaugeChart from '@/components/charts/GaugeChart'
-import { formatBytes } from '@/lib/formatters'
 
 export default function GpuCard() {
   const current = useMonitorStore((s) => s.current)
@@ -56,10 +55,17 @@ export default function GpuCard() {
             </div>
           )}
 
-          {gpu.fanSpeed !== null && (
+          {gpu.powerDraw !== null && (
             <div>
-              <span className="text-text-secondary">风扇转速</span>
-              <div className="font-medium">{gpu.fanSpeed}%</div>
+              <span className="text-text-secondary">功耗</span>
+              <div className="font-medium">{gpu.powerDraw}W</div>
+            </div>
+          )}
+
+          {gpu.memControllerLoad !== null && (
+            <div>
+              <span className="text-text-secondary">显存控制器</span>
+              <div className="font-medium">{gpu.memControllerLoad}%</div>
             </div>
           )}
 
