@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 export type BgType = 'theme' | 'solid' | 'gradient' | 'image'
+export type BgImageSize = 'cover' | 'contain' | 'auto'
 export type ClockSize = 'small' | 'medium' | 'large' | 'xlarge'
 export type ClockFormat = '24h' | '12h'
 export type ClockPosition = 'center' | 'top' | 'top-left' | 'top-right' | 'bottom' | 'bottom-left' | 'bottom-right'
@@ -27,6 +28,8 @@ interface ThemeState {
   bgColor: string
   bgGradient: string
   bgImage: string
+  bgImageSize: BgImageSize
+  bgImageBlur: number
 
   // Clock customization
   clockFormat: ClockFormat
@@ -50,6 +53,8 @@ interface ThemeState {
   setBgColor: (c: string) => void
   setBgGradient: (g: string) => void
   setBgImage: (i: string) => void
+  setBgImageSize: (s: BgImageSize) => void
+  setBgImageBlur: (b: number) => void
   setClockFormat: (f: ClockFormat) => void
   setShowSeconds: (v: boolean) => void
   setShowDate: (v: boolean) => void
@@ -72,6 +77,8 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   bgColor: '#0f172a',
   bgGradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
   bgImage: '',
+  bgImageSize: 'cover',
+  bgImageBlur: 0,
 
   clockFormat: '24h',
   showSeconds: true,
@@ -91,6 +98,8 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   setBgColor: (bgColor) => set({ bgColor }),
   setBgGradient: (bgGradient) => set({ bgGradient }),
   setBgImage: (bgImage) => set({ bgImage }),
+  setBgImageSize: (bgImageSize) => set({ bgImageSize }),
+  setBgImageBlur: (bgImageBlur) => set({ bgImageBlur }),
   setClockFormat: (clockFormat) => set({ clockFormat }),
   setShowSeconds: (showSeconds) => set({ showSeconds }),
   setShowDate: (showDate) => set({ showDate }),

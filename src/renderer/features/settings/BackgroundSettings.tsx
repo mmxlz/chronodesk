@@ -1,4 +1,4 @@
-import { useThemeStore, BgType } from '@/store/theme-store'
+import { useThemeStore, BgType, BgImageSize } from '@/store/theme-store'
 import { cn } from '@/lib/cn'
 
 const gradients = [
@@ -13,7 +13,7 @@ const gradients = [
 ]
 
 export default function BackgroundSettings() {
-  const { bgType, bgColor, bgGradient, bgImage, setBgType, setBgColor, setBgGradient, setBgImage } =
+  const { bgType, bgColor, bgGradient, bgImage, bgImageSize, bgImageBlur, setBgType, setBgColor, setBgGradient, setBgImage, setBgImageSize, setBgImageBlur } =
     useThemeStore()
 
   const handleImageUpload = () => {
@@ -105,18 +105,57 @@ export default function BackgroundSettings() {
             选择图片
           </button>
           {bgImage && (
-            <div className="relative">
-              <div
-                className="h-24 rounded-lg bg-cover bg-center"
-                style={{ backgroundImage: `url(${bgImage})` }}
-              />
-              <button
-                onClick={() => setBgImage('')}
-                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-error text-white text-xs flex items-center justify-center"
-              >
-                ✕
-              </button>
-            </div>
+            <>
+              <div className="relative">
+                <div
+                  className="h-24 rounded-lg bg-cover bg-center"
+                  style={{ backgroundImage: `url(${bgImage})` }}
+                />
+                <button
+                  onClick={() => setBgImage('')}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-error text-white text-xs flex items-center justify-center"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Image size */}
+              <div>
+                <label className="text-xs text-text-secondary block mb-1.5">图片大小</label>
+                <div className="flex gap-2">
+                  {([['cover', '填充'], ['contain', '适应'], ['auto', '原始']] as [BgImageSize, string][]).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setBgImageSize(key)}
+                      className={cn(
+                        'px-3 py-1.5 text-xs rounded-lg border transition-colors',
+                        bgImageSize === key
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-border text-text-secondary hover:border-text-secondary'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Image blur */}
+              <div>
+                <label className="text-xs text-text-secondary block mb-1.5">
+                  模糊度: {bgImageBlur}px
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={20}
+                  step={1}
+                  value={bgImageBlur}
+                  onChange={(e) => setBgImageBlur(Number(e.target.value))}
+                  className="w-full accent-accent"
+                />
+              </div>
+            </>
           )}
         </div>
       )}

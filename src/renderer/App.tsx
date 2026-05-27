@@ -2,7 +2,7 @@ import { useEffect, useMemo, useCallback } from 'react'
 import TopBar from '@/components/layout/TopBar'
 import Sidebar from '@/components/layout/Sidebar'
 import PanelContainer from '@/components/layout/PanelContainer'
-import { useThemeStore, BgType } from '@/store/theme-store'
+import { useThemeStore, BgType, BgImageSize } from '@/store/theme-store'
 import { useSettingsStore, ViewId } from '@/store/settings-store'
 import { usePomodoroStore } from '@/store/pomodoro-store'
 import { useNotesStore } from '@/store/notes-store'
@@ -14,7 +14,9 @@ function getBackgroundStyle(
   bgType: BgType,
   bgColor: string,
   bgGradient: string,
-  bgImage: string
+  bgImage: string,
+  bgImageSize: BgImageSize,
+  bgImageBlur: number
 ): React.CSSProperties {
   switch (bgType) {
     case 'solid':
@@ -25,8 +27,9 @@ function getBackgroundStyle(
       return bgImage
         ? {
             backgroundImage: `url(${bgImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
+            backgroundSize: bgImageSize,
+            backgroundPosition: 'center',
+            filter: bgImageBlur > 0 ? `blur(${bgImageBlur}px)` : undefined
           }
         : {}
     default:
@@ -42,6 +45,8 @@ export default function App() {
   const bgColor = useThemeStore((s) => s.bgColor)
   const bgGradient = useThemeStore((s) => s.bgGradient)
   const bgImage = useThemeStore((s) => s.bgImage)
+  const bgImageSize = useThemeStore((s) => s.bgImageSize)
+  const bgImageBlur = useThemeStore((s) => s.bgImageBlur)
   const miniMode = useSettingsStore((s) => s.miniMode)
   const setSelectedView = useSettingsStore((s) => s.setSelectedView)
   const toggleMiniMode = useSettingsStore((s) => s.toggleMiniMode)
@@ -59,8 +64,8 @@ export default function App() {
 
   // Background style
   const bgStyle = useMemo(
-    () => getBackgroundStyle(bgType, bgColor, bgGradient, bgImage),
-    [bgType, bgColor, bgGradient, bgImage]
+    () => getBackgroundStyle(bgType, bgColor, bgGradient, bgImage, bgImageSize, bgImageBlur),
+    [bgType, bgColor, bgGradient, bgImage, bgImageSize, bgImageBlur]
   )
 
   // Hydrate stores from electron-store on mount
