@@ -49,25 +49,8 @@ export default function MemoryCard() {
         </div>
       </div>
 
-      {/* Memory usage bar */}
-      <div>
-        <div className="flex justify-between text-[10px] text-text-secondary mb-1">
-          <span>内存使用</span>
-          <span>{Math.round(percentage)}%</span>
-        </div>
-        <div className="h-2 rounded-full bg-border overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${percentage}%`,
-              backgroundColor: percentage > 85 ? 'var(--color-warning)' : 'var(--color-accent)'
-            }}
-          />
-        </div>
-      </div>
-
       {/* History sparkline */}
-      <div className="flex items-end gap-px h-6 mt-auto">
+      <div className="flex items-end gap-px h-12 mt-auto">
         {memoryHistory.slice(-40).map((p, i) => (
           <div
             key={i}
