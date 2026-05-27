@@ -61,14 +61,19 @@ export default function App() {
 
   useSystemStats()
 
-  // Apply theme CSS variables
+  const customColors = useThemeStore((s) => s.customColors)
+
+  // Apply theme CSS variables, then overlay custom colors
   useEffect(() => {
     const theme = getTheme(currentTheme)
     const root = document.documentElement
     Object.entries(theme.colors).forEach(([key, value]) => {
       root.style.setProperty(`--color-${key}`, value)
     })
-  }, [currentTheme])
+    Object.entries(customColors).forEach(([key, value]) => {
+      if (value) root.style.setProperty(`--color-${key}`, value)
+    })
+  }, [currentTheme, customColors])
 
   // Background style
   const bgStyle = useMemo(
