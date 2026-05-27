@@ -37,16 +37,6 @@ export default function GpuCard() {
 
         {/* Details */}
         <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          {gpu.vramTotal > 0 && (
-            <div>
-              <span className="text-text-secondary">显存</span>
-              <div className="font-medium">
-                {formatBytes(gpu.vramUsed)} / {formatBytes(gpu.vramTotal)}
-                <span className="text-text-secondary ml-1">({vramPercent}%)</span>
-              </div>
-            </div>
-          )}
-
           {gpu.temperature !== null && (
             <div>
               <span className="text-text-secondary">温度</span>
