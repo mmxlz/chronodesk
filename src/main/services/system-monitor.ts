@@ -1,9 +1,30 @@
 import { BrowserWindow } from 'electron'
 import si from 'systeminformation'
 import { SystemStats } from '../../renderer/types/monitor'
+import { execSync } from 'child_process'
 
 let intervalId: ReturnType<typeof setInterval> | null = null
 let mainWindowRef: BrowserWindow | null = null
+
+// Fallback: read CPU temp via wmic (Windows only, may need admin)
+function getCpuTempFallback(): number | null {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync(
+        'wmic /namespace:\\\\root\\wmi PATH MSAcpi_ThermalZoneTemperature get CurrentTemperature /value',
+        { encoding: 'utf-8', timeout: 3000 }
+      )
+      const match = out.match(/CurrentTemperature=(\d+)/)
+      if (match) {
+        // wmic returns in tenths of Kelvin, convert to Celsius
+        return Math.round((parseInt(match[1]) / 10) - 273.15)
+      }
+    }
+  } catch {
+    // wmic may fail without admin
+  }
+  return null
+}
 
 async function collectStats(): Promise<SystemStats> {
   const [cpuLoad, mem, fsSize, networkStats, cpuTemp, processes, gpuData, time] =
@@ -18,14 +39,22 @@ async function collectStats(): Promise<SystemStats> {
       si.time()
     ])
 
-  // GPU info
-  const gpu = (gpuData.controllers || []).map((g) => ({
-    model: g.model || 'Unknown GPU',
-    vramTotal: g.vram || 0,
-    vramUsed: g.memoryUsed || 0,
-    temperature: g.temperatureGpu ?? null,
-    load: g.utilizationGpu ?? null
-  }))
+  // CPU temperature: try systeminformation first, then wmic fallback
+  let cpuTempValue = cpuTemp.main ?? null
+  if (cpuTempValue === null) {
+    cpuTempValue = getCpuTempFallback()
+  }
+
+  // GPU info: filter out virtual adapters (no VRAM and no temp/load)
+  const gpu = (gpuData.controllers || [])
+    .filter((g) => g.vram > 0 || g.utilizationGpu != null || g.temperatureGpu != null)
+    .map((g) => ({
+      model: g.model || 'Unknown GPU',
+      vramTotal: g.vram || 0,
+      vramUsed: g.memoryUsed || 0,
+      temperature: g.temperatureGpu ?? null,
+      load: g.utilizationGpu ?? null
+    }))
 
   // Network totals
   const totalRx = networkStats.reduce((sum, n) => sum + (n.rx_bytes || 0), 0)
@@ -37,7 +66,7 @@ async function collectStats(): Promise<SystemStats> {
     cpu: {
       usage: Math.round(cpuLoad.currentLoad * 100) / 100,
       cores: cpuLoad.cpus.map((c) => Math.round(c.load * 100) / 100),
-      temperature: cpuTemp.main ?? null,
+      temperature: cpuTempValue,
       processCount: processes.all || 0,
       speed: 0
     },
