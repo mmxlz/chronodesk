@@ -16,7 +16,7 @@ export default function SettingsView() {
       <div className="bg-surface rounded-xl p-4">
         <h3 className="text-sm font-medium mb-2">关于</h3>
         <p className="text-xs text-text-secondary">
-          ChronoDesk v1.2.0 — 桌面时钟 + 性能监测 + 番茄钟 + 便签日历
+          ChronoDesk v1.2.1 — 桌面时钟 + 性能监测 + 番茄钟 + 便签日历
         </p>
         <p className="text-xs text-text-secondary mt-1">
           快捷键: Ctrl+1~5 切换页面 | Ctrl+M 迷你模式 | Ctrl+T 置顶
