@@ -3,6 +3,7 @@ import { create } from 'zustand'
 export type BgType = 'theme' | 'solid' | 'gradient' | 'image'
 export type ClockSize = 'small' | 'medium' | 'large' | 'xlarge'
 export type ClockFormat = '24h' | '12h'
+export type ClockPosition = 'center' | 'top' | 'top-left' | 'top-right' | 'bottom' | 'bottom-left' | 'bottom-right'
 
 export interface WorldClockEntry {
   id: string
@@ -33,6 +34,8 @@ interface ThemeState {
   showDate: boolean
   clockSize: ClockSize
   clockColor: string
+  clockFont: string
+  clockPosition: ClockPosition
 
   // World clocks
   worldClocks: WorldClockEntry[]
@@ -52,6 +55,8 @@ interface ThemeState {
   setShowDate: (v: boolean) => void
   setClockSize: (s: ClockSize) => void
   setClockColor: (c: string) => void
+  setClockFont: (f: string) => void
+  setClockPosition: (p: ClockPosition) => void
   setWorldClocks: (w: WorldClockEntry[]) => void
   setCountdowns: (c: CountdownEntry[]) => void
   addCountdown: (c: CountdownEntry) => void
@@ -73,6 +78,8 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   showDate: true,
   clockSize: 'large',
   clockColor: '',
+  clockFont: '',
+  clockPosition: 'center',
 
   worldClocks: [],
   countdowns: [],
@@ -89,6 +96,8 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   setShowDate: (showDate) => set({ showDate }),
   setClockSize: (clockSize) => set({ clockSize }),
   setClockColor: (clockColor) => set({ clockColor }),
+  setClockFont: (clockFont) => set({ clockFont }),
+  setClockPosition: (clockPosition) => set({ clockPosition }),
   setWorldClocks: (worldClocks) => set({ worldClocks }),
   setCountdowns: (countdowns) => set({ countdowns }),
   addCountdown: (c) => set((s) => ({ countdowns: [...s.countdowns, c] })),

@@ -1,4 +1,4 @@
-import { useThemeStore, ClockSize, ClockFormat } from '@/store/theme-store'
+import { useThemeStore, ClockSize, ClockFormat, ClockPosition } from '@/store/theme-store'
 import { cn } from '@/lib/cn'
 
 const sizes: { key: ClockSize; label: string }[] = [
@@ -13,8 +13,29 @@ const formats: { key: ClockFormat; label: string }[] = [
   { key: '12h', label: '12小时' }
 ]
 
+const positions: { key: ClockPosition; label: string }[] = [
+  { key: 'center', label: '居中' },
+  { key: 'top', label: '顶部' },
+  { key: 'top-left', label: '左上' },
+  { key: 'top-right', label: '右上' },
+  { key: 'bottom', label: '底部' },
+  { key: 'bottom-left', label: '左下' },
+  { key: 'bottom-right', label: '右下' }
+]
+
+const fonts: { name: string; family: string }[] = [
+  { name: '默认', family: '' },
+  { name: 'JetBrains Mono', family: 'JetBrains Mono' },
+  { name: 'Fira Code', family: 'Fira Code' },
+  { name: 'Courier New', family: 'Courier New' },
+  { name: 'Arial', family: 'Arial' },
+  { name: 'Georgia', family: 'Georgia' },
+  { name: 'Impact', family: 'Impact' },
+  { name: 'Comic Sans', family: 'Comic Sans MS' }
+]
+
 const colorPresets = [
-  '', // inherit from theme
+  '',
   '#f8fafc',
   '#06b6d4',
   '#10b981',
@@ -32,16 +53,42 @@ export default function ClockSettings() {
     showDate,
     clockSize,
     clockColor,
+    clockFont,
+    clockPosition,
     setClockFormat,
     setShowSeconds,
     setShowDate,
     setClockSize,
-    setClockColor
+    setClockColor,
+    setClockFont,
+    setClockPosition
   } = useThemeStore()
 
   return (
     <div className="bg-surface rounded-xl p-4 space-y-4">
       <h3 className="text-sm font-medium">时钟设置</h3>
+
+      {/* Font */}
+      <div>
+        <label className="text-xs text-text-secondary block mb-1.5">字体</label>
+        <div className="flex gap-2 flex-wrap">
+          {fonts.map((f) => (
+            <button
+              key={f.family}
+              onClick={() => setClockFont(f.family)}
+              className={cn(
+                'px-3 py-1.5 text-xs rounded-lg border transition-colors',
+                clockFont === f.family
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border text-text-secondary hover:border-text-secondary'
+              )}
+              style={{ fontFamily: f.family || undefined }}
+            >
+              {f.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Format */}
       <div>
@@ -80,6 +127,27 @@ export default function ClockSettings() {
               )}
             >
               {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Position */}
+      <div>
+        <label className="text-xs text-text-secondary block mb-1.5">位置</label>
+        <div className="grid grid-cols-4 gap-1.5">
+          {positions.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setClockPosition(p.key)}
+              className={cn(
+                'px-2 py-1 text-[10px] rounded-md border transition-colors',
+                clockPosition === p.key
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border text-text-secondary hover:border-text-secondary'
+              )}
+            >
+              {p.label}
             </button>
           ))}
         </div>

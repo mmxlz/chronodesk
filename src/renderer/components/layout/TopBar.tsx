@@ -12,7 +12,7 @@ export default function TopBar() {
 
   return (
     <div
-      className="h-8 flex items-center justify-between select-none"
+      className="h-8 flex items-center justify-between select-none bg-bg/60 backdrop-blur-md border-b border-border/30"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="flex items-center px-3 gap-2">

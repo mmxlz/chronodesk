@@ -18,6 +18,7 @@ export default function DigitalClock() {
   const showDate = useThemeStore((s) => s.showDate)
   const clockSize = useThemeStore((s) => s.clockSize)
   const clockColor = useThemeStore((s) => s.clockColor)
+  const clockFont = useThemeStore((s) => s.clockFont)
 
   const theme = getTheme(currentTheme)
 
@@ -30,12 +31,15 @@ export default function DigitalClock() {
   const m = now.getMinutes().toString().padStart(2, '0')
   const s = now.getSeconds().toString().padStart(2, '0')
 
+  // Determine font: custom > theme default
+  const fontFamily = clockFont || theme.clockFont
+
   return (
     <div className="flex flex-col items-center justify-center gap-4">
       <div
         className={`${sizeMap[clockSize]} font-bold tracking-tight leading-none`}
         style={{
-          fontFamily: theme.clockFont,
+          fontFamily,
           color: clockColor || undefined
         }}
       >
