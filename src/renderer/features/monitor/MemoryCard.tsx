@@ -50,7 +50,7 @@ export default function MemoryCard() {
       </div>
 
       {/* History sparkline */}
-      <div className="flex items-end gap-px h-12 mt-auto">
+      <div className="flex items-end gap-px h-24 mt-auto">
         {memoryHistory.slice(-40).map((p, i) => (
           <div
             key={i}
