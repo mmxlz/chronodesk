@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { FiMinus, FiSquare, FiX, FiMaximize2 } from 'react-icons/fi'
+import { FiMinus, FiSquare, FiX, FiMaximize2, FiMinimize2 } from 'react-icons/fi'
+import { useSettingsStore } from '@/store/settings-store'
 
 export default function TopBar() {
   const [isMaximized, setIsMaximized] = useState(false)
+  const toggleMiniMode = useSettingsStore((s) => s.toggleMiniMode)
 
   useEffect(() => {
     window.api.isMaximized().then(setIsMaximized)
@@ -22,6 +24,13 @@ export default function TopBar() {
         className="flex h-full"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
+        <button
+          onClick={toggleMiniMode}
+          className="w-11 h-full flex items-center justify-center hover:bg-surface-hover transition-colors"
+          title="迷你模式 (Ctrl+M)"
+        >
+          <FiMinimize2 size={14} />
+        </button>
         <button
           onClick={() => window.api.minimize()}
           className="w-11 h-full flex items-center justify-center hover:bg-surface-hover transition-colors"

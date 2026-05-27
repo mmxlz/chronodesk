@@ -1,6 +1,6 @@
 {
   "name": "chronodesk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Desktop clock with system monitor, pomodoro timer, and sticky notes",
   "main": "./out/main/index.js",
   "author": "ChronoDesk",

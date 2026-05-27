@@ -1,28 +1,58 @@
 import { useClock } from './useClock'
-import { formatTime, formatDate } from '@/lib/formatters'
-import { useThemeStore } from '@/store/theme-store'
+import { formatDate } from '@/lib/formatters'
+import { useThemeStore, ClockSize } from '@/store/theme-store'
 import { getTheme } from '@/themes'
+
+const sizeMap: Record<ClockSize, string> = {
+  small: 'text-4xl',
+  medium: 'text-6xl',
+  large: 'text-[7rem]',
+  xlarge: 'text-[9rem]'
+}
 
 export default function DigitalClock() {
   const now = useClock()
   const currentTheme = useThemeStore((s) => s.currentTheme)
+  const clockFormat = useThemeStore((s) => s.clockFormat)
+  const showSeconds = useThemeStore((s) => s.showSeconds)
+  const showDate = useThemeStore((s) => s.showDate)
+  const clockSize = useThemeStore((s) => s.clockSize)
+  const clockColor = useThemeStore((s) => s.clockColor)
+
   const theme = getTheme(currentTheme)
-  const timeStr = formatTime(now)
-  const [h, m, s] = timeStr.split(':')
+
+  // Format hours based on 12/24h
+  let hours = now.getHours()
+  if (clockFormat === '12h') {
+    hours = hours % 12 || 12
+  }
+  const h = hours.toString().padStart(2, '0')
+  const m = now.getMinutes().toString().padStart(2, '0')
+  const s = now.getSeconds().toString().padStart(2, '0')
 
   return (
     <div className="flex flex-col items-center justify-center gap-4">
       <div
-        className="text-[7rem] font-bold tracking-tight leading-none"
-        style={{ fontFamily: theme.clockFont }}
+        className={`${sizeMap[clockSize]} font-bold tracking-tight leading-none`}
+        style={{
+          fontFamily: theme.clockFont,
+          color: clockColor || undefined
+        }}
       >
         <span>{h}</span>
         <span className="animate-blink">:</span>
         <span>{m}</span>
-        <span className="animate-blink">:</span>
-        <span>{s}</span>
+        {showSeconds && (
+          <>
+            <span className="animate-blink">:</span>
+            <span>{s}</span>
+          </>
+        )}
       </div>
-      <div className="text-lg text-text-secondary">{formatDate(now)}</div>
+
+      {showDate && (
+        <div className="text-lg text-text-secondary">{formatDate(now)}</div>
+      )}
     </div>
   )
 }
