@@ -4,11 +4,10 @@ import { formatBytes } from '@/lib/formatters'
 
 export default function MemoryCard() {
   const current = useMonitorStore((s) => s.current)
-  const staticInfo = useMonitorStore((s) => s.staticInfo)
   const memoryHistory = useMonitorStore((s) => s.memoryHistory)
   const percentage = current?.memory.percentage ?? 0
-  const memSpeed = staticInfo?.memSpeed ?? null
   const active = current?.memory.active ?? 0
+  const used = current?.memory.used ?? 0
   const available = current?.memory.available ?? 0
   const total = current?.memory.total ?? 0
   const swapTotal = current?.memory.swapTotal ?? 0
@@ -29,19 +28,17 @@ export default function MemoryCard() {
           <GaugeChart value={percentage} size={110} />
         </div>
 
-        <div className="flex-1 flex flex-col gap-2 text-xs">
+        <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <div>
+            <span className="text-text-secondary">已使用</span>
+            <div className="font-medium">{formatBytes(used)}</div>
+          </div>
           <div>
             <span className="text-text-secondary">可用</span>
             <div className="font-medium">{formatBytes(available)}</div>
           </div>
-          {memSpeed && (
-            <div>
-              <span className="text-text-secondary">频率</span>
-              <div className="font-medium">{memSpeed} MHz</div>
-            </div>
-          )}
           {swapTotal > 0 && (
-            <div>
+            <div className="col-span-2">
               <span className="text-text-secondary">虚拟内存</span>
               <div className="font-medium">
                 {formatBytes(swapUsed)} / {formatBytes(swapTotal)}
@@ -49,6 +46,23 @@ export default function MemoryCard() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Memory usage bar */}
+      <div>
+        <div className="flex justify-between text-[10px] text-text-secondary mb-1">
+          <span>内存使用</span>
+          <span>{Math.round(percentage)}%</span>
+        </div>
+        <div className="h-2 rounded-full bg-border overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${percentage}%`,
+              backgroundColor: percentage > 85 ? 'var(--color-warning)' : 'var(--color-accent)'
+            }}
+          />
         </div>
       </div>
 

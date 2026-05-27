@@ -46,7 +46,6 @@ export interface StaticSystemInfo {
   cpuCores: number
   cpuSpeed: number
   totalMemory: number
-  memSpeed: number | null
   osPlatform: string
   osRelease: string
   osHostname: string

@@ -124,11 +124,10 @@ export function stopSystemMonitor(): void {
 }
 
 export async function getStaticInfo() {
-  const [cpu, os, netInterfaces, memLayout] = await Promise.all([
+  const [cpu, os, netInterfaces] = await Promise.all([
     si.cpu(),
     si.osInfo(),
-    si.networkInterfaces(),
-    si.memLayout()
+    si.networkInterfaces()
   ])
   const mem = await si.mem()
 
@@ -141,16 +140,11 @@ export async function getStaticInfo() {
       speed: n.speed ?? null
     }))
 
-  const memSpeed = memLayout.length > 0 && memLayout[0].clockSpeed
-    ? memLayout[0].clockSpeed
-    : null
-
   return {
     cpuModel: `${cpu.manufacturer} ${cpu.brand}`,
     cpuCores: cpu.cores,
     cpuSpeed: cpu.speed,
     totalMemory: mem.total,
-    memSpeed,
     osPlatform: os.platform,
     osRelease: os.release,
     osHostname: os.hostname,
