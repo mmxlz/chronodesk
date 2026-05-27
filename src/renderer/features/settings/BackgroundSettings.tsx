@@ -1,4 +1,4 @@
-import { useThemeStore, BgType, BgImageSize } from '@/store/theme-store'
+import { useThemeStore, BgType } from '@/store/theme-store'
 import { cn } from '@/lib/cn'
 
 const gradients = [
@@ -121,23 +121,18 @@ export default function BackgroundSettings() {
 
               {/* Image size */}
               <div>
-                <label className="text-xs text-text-secondary block mb-1.5">图片大小</label>
-                <div className="flex gap-2">
-                  {([['cover', '填充'], ['contain', '适应'], ['auto', '原始']] as [BgImageSize, string][]).map(([key, label]) => (
-                    <button
-                      key={key}
-                      onClick={() => setBgImageSize(key)}
-                      className={cn(
-                        'px-3 py-1.5 text-xs rounded-lg border transition-colors',
-                        bgImageSize === key
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-border text-text-secondary hover:border-text-secondary'
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <label className="text-xs text-text-secondary block mb-1.5">
+                  图片大小: {bgImageSize}%
+                </label>
+                <input
+                  type="range"
+                  min={20}
+                  max={300}
+                  step={5}
+                  value={bgImageSize}
+                  onChange={(e) => setBgImageSize(Number(e.target.value))}
+                  className="w-full accent-accent"
+                />
               </div>
 
               {/* Image blur */}
@@ -149,7 +144,7 @@ export default function BackgroundSettings() {
                   type="range"
                   min={0}
                   max={20}
-                  step={1}
+                  step={0.5}
                   value={bgImageBlur}
                   onChange={(e) => setBgImageBlur(Number(e.target.value))}
                   className="w-full accent-accent"

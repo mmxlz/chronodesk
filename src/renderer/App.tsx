@@ -13,27 +13,29 @@ import { useSystemStats } from '@/features/monitor/useSystemStats'
 function getBackgroundStyle(
   bgType: BgType,
   bgColor: string,
-  bgGradient: string,
-  bgImage: string,
-  bgImageSize: BgImageSize,
-  bgImageBlur: number
+  bgGradient: string
 ): React.CSSProperties {
   switch (bgType) {
     case 'solid':
       return { backgroundColor: bgColor }
     case 'gradient':
       return { background: bgGradient }
-    case 'image':
-      return bgImage
-        ? {
-            backgroundImage: `url(${bgImage})`,
-            backgroundSize: bgImageSize,
-            backgroundPosition: 'center',
-            filter: bgImageBlur > 0 ? `blur(${bgImageBlur}px)` : undefined
-          }
-        : {}
     default:
       return {}
+  }
+}
+
+function getImageBgStyle(
+  bgImage: string,
+  bgImageSize: number,
+  bgImageBlur: number
+): React.CSSProperties | null {
+  if (!bgImage) return null
+  return {
+    backgroundImage: `url(${bgImage})`,
+    backgroundSize: `${bgImageSize}%`,
+    backgroundPosition: 'center',
+    filter: bgImageBlur > 0 ? `blur(${bgImageBlur}px)` : undefined
   }
 }
 
@@ -64,8 +66,12 @@ export default function App() {
 
   // Background style
   const bgStyle = useMemo(
-    () => getBackgroundStyle(bgType, bgColor, bgGradient, bgImage, bgImageSize, bgImageBlur),
-    [bgType, bgColor, bgGradient, bgImage, bgImageSize, bgImageBlur]
+    () => getBackgroundStyle(bgType, bgColor, bgGradient),
+    [bgType, bgColor, bgGradient]
+  )
+  const imageBgStyle = useMemo(
+    () => bgType === 'image' ? getImageBgStyle(bgImage, bgImageSize, bgImageBlur) : null,
+    [bgType, bgImage, bgImageSize, bgImageBlur]
   )
 
   // Hydrate stores from electron-store on mount
@@ -131,22 +137,32 @@ export default function App() {
   if (miniMode) {
     return (
       <div
-        className="h-screen flex items-center justify-center bg-bg text-text"
+        className="h-screen relative flex items-center justify-center bg-bg text-text overflow-hidden"
         style={bgStyle}
         onDoubleClick={toggleMiniMode}
         title="双击退出迷你模式"
       >
-        <MiniClock />
+        {imageBgStyle && (
+          <div className="absolute inset-0 z-0" style={imageBgStyle} />
+        )}
+        <div className="relative z-10">
+          <MiniClock />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex flex-col bg-bg text-text" style={bgStyle}>
-      <TopBar />
-      <div className="flex-1 flex min-h-0">
-        <Sidebar />
-        <PanelContainer />
+    <div className="h-screen relative flex flex-col bg-bg text-text overflow-hidden" style={bgStyle}>
+      {imageBgStyle && (
+        <div className="absolute inset-0 z-0" style={imageBgStyle} />
+      )}
+      <div className="relative z-10 flex flex-col h-full">
+        <TopBar />
+        <div className="flex-1 flex min-h-0">
+          <Sidebar />
+          <PanelContainer />
+        </div>
       </div>
     </div>
   )

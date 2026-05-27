@@ -26,7 +26,7 @@ export default function Sidebar() {
   const { selectedView, setSelectedView } = useSettingsStore()
 
   return (
-    <div className="w-16 h-full flex flex-col items-center py-4 gap-1 bg-bg/60 backdrop-blur-md">
+    <div className="w-16 h-full flex flex-col items-center py-4 gap-1">
       {navItems.map((item) => (
         <button
           key={item.id}

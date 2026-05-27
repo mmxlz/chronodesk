@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type BgType = 'theme' | 'solid' | 'gradient' | 'image'
-export type BgImageSize = 'cover' | 'contain' | 'auto'
+export type BgImageSize = number // percentage, 100 = cover
 export type ClockSize = 'small' | 'medium' | 'large' | 'xlarge'
 export type ClockFormat = '24h' | '12h'
 export type ClockPosition = 'center' | 'top' | 'top-left' | 'top-right' | 'bottom' | 'bottom-left' | 'bottom-right'
@@ -77,7 +77,7 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   bgColor: '#0f172a',
   bgGradient: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
   bgImage: '',
-  bgImageSize: 'cover',
+  bgImageSize: 100,
   bgImageBlur: 0,
 
   clockFormat: '24h',
