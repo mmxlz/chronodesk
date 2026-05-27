@@ -14,7 +14,7 @@ function getCpuTempFallback(): Promise<number | null> {
       return
     }
     exec(
-      'powershell -Command "Get-CimInstance MSAcpi_ThermalZoneTemperature -Namespace root/wmi -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentTemperature"',
+      'powershell -Command "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation -Namespace root/cimv2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Temperature"',
       { timeout: 5000 },
       (err, stdout) => {
         if (err || !stdout) {
@@ -23,8 +23,8 @@ function getCpuTempFallback(): Promise<number | null> {
         }
         const match = stdout.match(/(\d+)/)
         if (match) {
-          // Returns tenths of Kelvin, convert to Celsius
-          resolve(Math.round(parseInt(match[1]) / 10 - 273.15))
+          // Value is in tenths of degrees Celsius
+          resolve(Math.round(parseInt(match[1]) / 10))
         } else {
           resolve(null)
         }
