@@ -23,9 +23,9 @@ export default function GpuCard() {
   return (
     <div className="bg-surface rounded-xl p-4 flex flex-col gap-3">
       {/* Header */}
-      <div>
-        <h3 className="text-sm font-medium text-text-secondary mb-1">GPU</h3>
-        <div className="text-xs text-text-secondary leading-tight">{gpu.model}</div>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-medium text-text-secondary">GPU</h3>
+        <span className="text-xs text-text-secondary text-right">{gpu.model}</span>
       </div>
 
       <div className="flex gap-4">
