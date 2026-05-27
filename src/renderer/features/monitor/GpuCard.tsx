@@ -62,13 +62,6 @@ export default function GpuCard() {
             </div>
           )}
 
-          {gpu.memControllerLoad !== null && (
-            <div>
-              <span className="text-text-secondary">显存控制器</span>
-              <div className="font-medium">{gpu.memControllerLoad}%</div>
-            </div>
-          )}
-
           {gpu.coreClock !== null && gpu.coreClock > 0 && (
             <div>
               <span className="text-text-secondary">核心频率</span>

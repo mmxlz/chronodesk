@@ -29,10 +29,6 @@ export default function MemoryCard() {
 
         <div className="flex-1 flex flex-col gap-2 text-xs">
           <div>
-            <span className="text-text-secondary">已使用</span>
-            <div className="font-medium">{formatBytes(active)}</div>
-          </div>
-          <div>
             <span className="text-text-secondary">可用</span>
             <div className="font-medium">{formatBytes(available)}</div>
           </div>
@@ -45,23 +41,6 @@ export default function MemoryCard() {
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Memory usage bar */}
-      <div>
-        <div className="flex justify-between text-[10px] text-text-secondary mb-1">
-          <span>内存</span>
-          <span>{Math.round(percentage)}%</span>
-        </div>
-        <div className="h-2 rounded-full bg-border overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${percentage}%`,
-              backgroundColor: percentage > 85 ? 'var(--color-warning)' : 'var(--color-accent)'
-            }}
-          />
         </div>
       </div>
 
