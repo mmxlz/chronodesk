@@ -33,6 +33,9 @@ export interface SystemStats {
     vramUsed: number
     temperature: number | null
     load: number | null
+    fanSpeed: number | null
+    coreClock: number | null
+    memoryClock: number | null
   }>
   uptime: number
 }

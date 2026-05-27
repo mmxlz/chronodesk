@@ -32,11 +32,11 @@ export default function GpuCard() {
       <div className="flex gap-4">
         {/* Load gauge */}
         <div className="flex-shrink-0">
-          <GaugeChart value={gpu.load ?? 0} size={110} label="负载" />
+          <GaugeChart value={gpu.load ?? 0} size={110} />
         </div>
 
         {/* Details */}
-        <div className="flex-1 flex flex-col gap-2 text-xs">
+        <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
           {gpu.vramTotal > 0 && (
             <div>
               <span className="text-text-secondary">显存</span>
@@ -66,10 +66,24 @@ export default function GpuCard() {
             </div>
           )}
 
-          {gpu.load !== null && (
+          {gpu.fanSpeed !== null && (
             <div>
-              <span className="text-text-secondary">GPU 负载</span>
-              <div className="font-medium">{gpu.load}%</div>
+              <span className="text-text-secondary">风扇转速</span>
+              <div className="font-medium">{gpu.fanSpeed}%</div>
+            </div>
+          )}
+
+          {gpu.coreClock !== null && gpu.coreClock > 0 && (
+            <div>
+              <span className="text-text-secondary">核心频率</span>
+              <div className="font-medium">{gpu.coreClock} MHz</div>
+            </div>
+          )}
+
+          {gpu.memoryClock !== null && gpu.memoryClock > 0 && (
+            <div>
+              <span className="text-text-secondary">显存频率</span>
+              <div className="font-medium">{gpu.memoryClock} MHz</div>
             </div>
           )}
         </div>

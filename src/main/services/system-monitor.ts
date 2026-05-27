@@ -53,7 +53,10 @@ async function collectStats(): Promise<SystemStats> {
       vramTotal: g.vram || 0,
       vramUsed: g.memoryUsed || 0,
       temperature: g.temperatureGpu ?? null,
-      load: g.utilizationGpu ?? null
+      load: g.utilizationGpu ?? null,
+      fanSpeed: g.fanSpeed ?? null,
+      coreClock: g.clockCore ?? null,
+      memoryClock: g.clockMemory ?? null
     }))
 
   // Network totals
