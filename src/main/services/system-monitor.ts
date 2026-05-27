@@ -1,29 +1,36 @@
 import { BrowserWindow } from 'electron'
 import si from 'systeminformation'
 import { SystemStats } from '../../renderer/types/monitor'
-import { execSync } from 'child_process'
+import { exec } from 'child_process'
 
 let intervalId: ReturnType<typeof setInterval> | null = null
 let mainWindowRef: BrowserWindow | null = null
 
-// Fallback: read CPU temp via wmic (Windows only, may need admin)
-function getCpuTempFallback(): number | null {
-  try {
-    if (process.platform === 'win32') {
-      const out = execSync(
-        'wmic /namespace:\\\\root\\wmi PATH MSAcpi_ThermalZoneTemperature get CurrentTemperature /value',
-        { encoding: 'utf-8', timeout: 3000 }
-      )
-      const match = out.match(/CurrentTemperature=(\d+)/)
-      if (match) {
-        // wmic returns in tenths of Kelvin, convert to Celsius
-        return Math.round((parseInt(match[1]) / 10) - 273.15)
-      }
+// Fallback: read CPU temp via PowerShell (Windows only)
+function getCpuTempFallback(): Promise<number | null> {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      resolve(null)
+      return
     }
-  } catch {
-    // wmic may fail without admin
-  }
-  return null
+    exec(
+      'powershell -Command "Get-CimInstance MSAcpi_ThermalZoneTemperature -Namespace root/wmi -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty CurrentTemperature"',
+      { timeout: 5000 },
+      (err, stdout) => {
+        if (err || !stdout) {
+          resolve(null)
+          return
+        }
+        const match = stdout.match(/(\d+)/)
+        if (match) {
+          // Returns tenths of Kelvin, convert to Celsius
+          resolve(Math.round(parseInt(match[1]) / 10 - 273.15))
+        } else {
+          resolve(null)
+        }
+      }
+    )
+  })
 }
 
 async function collectStats(): Promise<SystemStats> {
@@ -39,10 +46,10 @@ async function collectStats(): Promise<SystemStats> {
       si.time()
     ])
 
-  // CPU temperature: try systeminformation first, then wmic fallback
+  // CPU temperature: try systeminformation first, then PowerShell fallback
   let cpuTempValue = cpuTemp.main ?? null
   if (cpuTempValue === null) {
-    cpuTempValue = getCpuTempFallback()
+    cpuTempValue = await getCpuTempFallback()
   }
 
   // GPU info: filter out virtual adapters (no VRAM and no temp/load)
