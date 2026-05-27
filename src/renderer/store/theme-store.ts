@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type BgType = 'theme' | 'solid' | 'gradient' | 'image'
-export type BgImageSize = number // percentage, 100 = cover
+export type BgImageSize = 'cover' | 'contain' | 'auto' | number
 export type ClockSize = 'small' | 'medium' | 'large' | 'xlarge'
 export type ClockFormat = '24h' | '12h'
 export type ClockPosition = 'center' | 'top' | 'top-left' | 'top-right' | 'bottom' | 'bottom-left' | 'bottom-right'

@@ -27,13 +27,14 @@ function getBackgroundStyle(
 
 function getImageBgStyle(
   bgImage: string,
-  bgImageSize: number,
+  bgImageSize: BgImageSize,
   bgImageBlur: number
 ): React.CSSProperties | null {
   if (!bgImage) return null
+  const size = typeof bgImageSize === 'number' ? `${bgImageSize}%` : bgImageSize
   return {
     backgroundImage: `url(${bgImage})`,
-    backgroundSize: `${bgImageSize}%`,
+    backgroundSize: size,
     backgroundPosition: 'center',
     filter: bgImageBlur > 0 ? `blur(${bgImageBlur}px)` : undefined
   }

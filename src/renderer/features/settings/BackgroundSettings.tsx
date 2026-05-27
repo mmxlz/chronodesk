@@ -119,44 +119,54 @@ export default function BackgroundSettings() {
                 </button>
               </div>
 
-              {/* Image size presets + slider */}
+              {/* Image size */}
               <div>
                 <label className="text-xs text-text-secondary block mb-1.5">图片大小</label>
                 <div className="flex gap-2 mb-2">
                   {[
-                    { label: '填充', value: 150 },
-                    { label: '适应', value: 75 },
-                    { label: '原始', value: 100 },
-                    { label: '自定义', value: -1 }
+                    { label: '填充', value: 'cover' as const },
+                    { label: '适应', value: 'contain' as const },
+                    { label: '原始', value: 'auto' as const },
+                    { label: '自定义', value: 'custom' as const }
                   ].map((p) => (
                     <button
                       key={p.label}
                       onClick={() => {
-                        if (p.value > 0) setBgImageSize(p.value)
+                        if (p.value === 'custom') {
+                          if (typeof bgImageSize !== 'number') setBgImageSize(100)
+                        } else {
+                          setBgImageSize(p.value)
+                        }
                       }}
                       className={cn(
                         'px-3 py-1.5 text-xs rounded-lg border transition-colors',
-                        p.value > 0 && bgImageSize === p.value
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-border text-text-secondary hover:border-text-secondary'
+                        p.value === 'custom'
+                          ? typeof bgImageSize === 'number'
+                            ? 'border-accent bg-accent/10 text-accent'
+                            : 'border-border text-text-secondary hover:border-text-secondary'
+                          : bgImageSize === p.value
+                            ? 'border-accent bg-accent/10 text-accent'
+                            : 'border-border text-text-secondary hover:border-text-secondary'
                       )}
                     >
                       {p.label}
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={10}
-                    max={300}
-                    step={1}
-                    value={bgImageSize}
-                    onChange={(e) => setBgImageSize(Number(e.target.value))}
-                    className="flex-1 accent-accent"
-                  />
-                  <span className="text-xs text-text-secondary w-10 text-right">{bgImageSize}%</span>
-                </div>
+                {typeof bgImageSize === 'number' && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={10}
+                      max={300}
+                      step={1}
+                      value={bgImageSize}
+                      onChange={(e) => setBgImageSize(Number(e.target.value))}
+                      className="flex-1 accent-accent"
+                    />
+                    <span className="text-xs text-text-secondary w-10 text-right">{bgImageSize}%</span>
+                  </div>
+                )}
               </div>
 
               {/* Image blur */}
