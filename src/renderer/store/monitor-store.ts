@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { SystemStats } from '../types/monitor'
+import { SystemStats, StaticSystemInfo } from '../types/monitor'
 import { MAX_HISTORY_POINTS } from '../lib/constants'
 
 interface DataPoint {
@@ -9,38 +9,37 @@ interface DataPoint {
 
 interface MonitorState {
   current: SystemStats | null
+  staticInfo: StaticSystemInfo | null
   cpuHistory: DataPoint[]
   memoryHistory: DataPoint[]
   networkRxHistory: DataPoint[]
-  networkTxHistory: number[]
   update: (stats: SystemStats) => void
+  setStaticInfo: (info: StaticSystemInfo) => void
 }
 
 export const useMonitorStore = create<MonitorState>()((set) => ({
   current: null,
+  staticInfo: null,
   cpuHistory: [],
   memoryHistory: [],
   networkRxHistory: [],
-  networkTxHistory: [],
   update: (stats) =>
     set((state) => {
       const now = Date.now()
-      const cpuHistory = [...state.cpuHistory, { time: now, value: stats.cpu.usage }].slice(
-        -MAX_HISTORY_POINTS
-      )
-      const memoryHistory = [
-        ...state.memoryHistory,
-        { time: now, value: stats.memory.percentage }
-      ].slice(-MAX_HISTORY_POINTS)
-
       return {
         current: stats,
-        cpuHistory,
-        memoryHistory,
+        cpuHistory: [...state.cpuHistory, { time: now, value: stats.cpu.usage }].slice(
+          -MAX_HISTORY_POINTS
+        ),
+        memoryHistory: [
+          ...state.memoryHistory,
+          { time: now, value: stats.memory.percentage }
+        ].slice(-MAX_HISTORY_POINTS),
         networkRxHistory: [
           ...state.networkRxHistory,
           { time: now, value: stats.network.rx_sec }
         ].slice(-MAX_HISTORY_POINTS)
       }
-    })
+    }),
+  setStaticInfo: (info) => set({ staticInfo: info })
 }))

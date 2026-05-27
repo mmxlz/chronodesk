@@ -1,9 +1,13 @@
 import { BrowserWindow, ipcMain, Notification, app } from 'electron'
 import { join } from 'path'
 import { getStore } from './store'
+import { getStaticInfo } from './services/system-monitor'
 
 export function registerIpcHandlers(mainWindow: BrowserWindow): void {
   const store = getStore()
+
+  // System
+  ipcMain.handle('system:getStaticInfo', () => getStaticInfo())
 
   // Window control
   ipcMain.handle('window:toggleAlwaysOnTop', () => {

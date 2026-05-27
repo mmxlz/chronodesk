@@ -33,3 +33,7 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 'ChronoDesk'
+  deleteAppDataOnUninstall: false
