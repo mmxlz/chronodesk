@@ -3,128 +3,138 @@ import si from 'systeminformation'
 import { SystemStats } from '../../renderer/types/monitor'
 import { exec, spawn, ChildProcess } from 'child_process'
 import path from 'path'
+import fs from 'fs'
+import os from 'os'
 
 let intervalId: ReturnType<typeof setInterval> | null = null
 let mainWindowRef: BrowserWindow | null = null
 let lhmProcess: ChildProcess | null = null
-let lhmStarted = false
+let lhmSensorPath: string | null = null
 
-// Find bundled LHM executable
-function getLhmPath(): string {
+// Find bundled LHM directory
+function getLhmDir(): string {
   const isDev = !app.isPackaged
   if (isDev) {
-    return path.join(__dirname, '..', '..', '..', 'build', 'lhm', 'LibreHardwareMonitor.exe')
+    return path.join(__dirname, '..', '..', '..', 'build', 'lhm')
   }
-  return path.join(process.resourcesPath, 'lhm', 'LibreHardwareMonitor.exe')
+  return path.join(process.resourcesPath, 'lhm')
 }
 
-// Check if LHM WMI namespace is already available (user may have LHM running)
-function checkLhmWmiAvailable(): Promise<boolean> {
+// Start LHM sensor reader PowerShell script with admin
+function startLhmSensor(): Promise<boolean> {
   return new Promise((resolve) => {
+    const lhmDir = getLhmDir()
+    const scriptPath = path.join(lhmDir, 'lhm-sensor.ps1')
+
+    if (!fs.existsSync(scriptPath)) {
+      console.warn('LHM sensor script not found:', scriptPath)
+      resolve(false)
+      return
+    }
+
+    const outputPath = path.join(os.tmpdir(), 'chronodesk-sensors.json')
+    const sentinelPath = path.join(os.tmpdir(), 'chronodesk-sensors.running')
+    lhmSensorPath = outputPath
+
+    // Clean up any previous run
+    try { fs.unlinkSync(sentinelPath) } catch {}
+    try { fs.unlinkSync(outputPath) } catch {}
+
+    // Start PowerShell with admin privileges
+    const psCmd = `Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -NoProfile -File "${scriptPath}" -OutputPath "${outputPath}"' -Verb RunAs -WindowStyle Hidden`
+
     exec(
-      'powershell -Command "Get-CimInstance -Namespace root/LibreHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Select-Object -First 1 | Out-Null; if($?) { exit 0 } else { exit 1 }"',
-      { timeout: 5000 },
+      `powershell -NoProfile -Command "${psCmd}"`,
+      { timeout: 10000 },
       (err) => {
-        resolve(!err)
+        if (err) {
+          console.warn('Failed to start LHM sensor (admin denied):', err.message)
+          resolve(false)
+          return
+        }
+
+        // Wait for the sensor script to start producing data
+        let retries = 0
+        const maxRetries = 15
+        const check = setInterval(() => {
+          retries++
+          if (fs.existsSync(outputPath)) {
+            clearInterval(check)
+            console.log('LHM sensor reader started successfully')
+            resolve(true)
+          } else if (retries >= maxRetries) {
+            clearInterval(check)
+            console.warn('LHM sensor reader did not start in time')
+            resolve(false)
+          }
+        }, 1000)
       }
     )
   })
 }
 
-// Start bundled LHM with admin privileges
-function startLhmProcess(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const lhmPath = getLhmPath()
-
-    // Check if already running (WMI namespace available)
-    checkLhmWmiAvailable().then((available) => {
-      if (available) {
-        lhmStarted = true
-        resolve(true)
-        return
-      }
-
-      // Start LHM with admin privileges via PowerShell
-      const psCmd = `Start-Process -FilePath '${lhmPath}' -WindowStyle Hidden -Verb RunAs -PassThru | Out-Null`
-      const child = exec(
-        `powershell -Command "${psCmd}"`,
-        { timeout: 10000 },
-        (err) => {
-          if (err) {
-            console.warn('Failed to start LHM (user may have denied admin):', err.message)
-            resolve(false)
-            return
-          }
-          // Wait for WMI namespace to become available
-          let retries = 0
-          const maxRetries = 10
-          const checkInterval = setInterval(() => {
-            retries++
-            checkLhmWmiAvailable().then((available) => {
-              if (available || retries >= maxRetries) {
-                clearInterval(checkInterval)
-                lhmStarted = available
-                resolve(available)
-              }
-            })
-          }, 1000)
-        }
-      )
-
-      // Store reference to kill later
-      lhmProcess = child
-    })
-  })
-}
-
-// Kill bundled LHM process
-function stopLhmProcess(): void {
-  if (lhmProcess) {
-    try {
-      // Kill LHM and its child processes
-      exec('powershell -Command "Get-Process LibreHardwareMonitor -ErrorAction SilentlyContinue | Stop-Process -Force"', { timeout: 3000 })
-    } catch {
-      // ignore
-    }
-    lhmProcess = null
+// Stop LHM sensor reader
+function stopLhmSensor(): void {
+  if (lhmSensorPath) {
+    const sentinelPath = lhmSensorPath.replace('.json', '.running')
+    try { fs.unlinkSync(sentinelPath) } catch {}
+    // Wait a bit then clean up
+    setTimeout(() => {
+      try { fs.unlinkSync(lhmSensorPath!) } catch {}
+    }, 2000)
+    lhmSensorPath = null
   }
-  lhmStarted = false
+  // Kill any remaining PowerShell processes related to LHM
+  try {
+    exec('powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"CommandLine LIKE \'%lhm-sensor%\'\\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"', { timeout: 3000 })
+  } catch {}
 }
 
-// Read CPU temp: try LibreHardwareMonitor WMI first, then thermal zone fallback
+// Read cached LHM sensor data
+function readLhmSensors(): { cpu: Record<string, number>; gpu: Record<string, number> } | null {
+  if (!lhmSensorPath || !fs.existsSync(lhmSensorPath)) return null
+  try {
+    const data = fs.readFileSync(lhmSensorPath, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return null
+  }
+}
+
+// Read CPU temp: try LHM sensor file first, then thermal zone fallback
 function getCpuTempFallback(): Promise<number | null> {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') {
       resolve(null)
       return
     }
-    // Try LibreHardwareMonitor WMI first (requires LHM to be running)
+
+    // Try LHM sensor data first (written by PowerShell script)
+    const lhmData = readLhmSensors()
+    if (lhmData?.cpu) {
+      // Prefer "Core Max" or "CPU Package", fall back to first available
+      const temp = lhmData.cpu['Core Max'] ?? lhmData.cpu['CPU Package'] ?? Object.values(lhmData.cpu)[0]
+      if (temp && temp > 0) {
+        resolve(Math.round(temp))
+        return
+      }
+    }
+
+    // Fallback: thermal zone
     exec(
-      'powershell -Command "Get-CimInstance -Namespace root/LibreHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq \'Temperature\' -and $_.Name -like \'CPU Core*\' } | Select-Object -First 1 -ExpandProperty Value"',
+      'powershell -NoProfile -Command "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation -Namespace root/cimv2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Temperature"',
       { timeout: 5000 },
       (err, stdout) => {
-        const val = stdout ? parseFloat(stdout.trim()) : NaN
-        if (!err && !isNaN(val) && val > 0) {
-          resolve(Math.round(val))
+        if (err || !stdout) {
+          resolve(null)
           return
         }
-        // Fallback: thermal zone
-        exec(
-          'powershell -Command "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation -Namespace root/cimv2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Temperature"',
-          { timeout: 5000 },
-          (err2, stdout2) => {
-            if (err2 || !stdout2) {
-              resolve(null)
-              return
-            }
-            const match = stdout2.match(/(\d+)/)
-            if (match) {
-              resolve(Math.round(parseInt(match[1]) / 10))
-            } else {
-              resolve(null)
-            }
-          }
-        )
+        const match = stdout.match(/(\d+)/)
+        if (match) {
+          resolve(Math.round(parseInt(match[1]) / 10))
+        } else {
+          resolve(null)
+        }
       }
     )
   })
@@ -173,27 +183,31 @@ async function collectStats(): Promise<SystemStats> {
       getNvidiaGpu()
     ])
 
-  // CPU temperature: try systeminformation first, then PowerShell fallback
+  // CPU temperature: try systeminformation first, then LHM/PowerShell fallback
   let cpuTempValue = cpuTemp.main ?? null
   if (cpuTempValue === null) {
     cpuTempValue = await getCpuTempFallback()
   }
 
-  // GPU info: prefer nvidia-smi, fallback to systeminformation
+  // GPU info: prefer nvidia-smi, fallback to LHM sensor, then systeminformation
+  const lhmData = readLhmSensors()
   const siGpu = (gpuData.controllers || [])
     .filter((g) => g.vram > 0 || g.utilizationGpu != null || g.temperatureGpu != null)
 
-  const gpu = siGpu.map((g) => ({
-    model: g.model || 'Unknown GPU',
-    vramTotal: g.vram || 0,
-    vramUsed: g.memoryUsed || 0,
-    temperature: nvidiaGpu?.temp ?? g.temperatureGpu ?? null,
-    load: nvidiaGpu?.load ?? g.utilizationGpu ?? null,
-    memControllerLoad: nvidiaGpu?.memLoad ?? g.utilizationMemory ?? null,
-    powerDraw: nvidiaGpu?.power ?? g.powerDraw ?? null,
-    coreClock: nvidiaGpu?.coreClock ?? g.clockCore ?? null,
-    memoryClock: nvidiaGpu?.memClock ?? g.clockMemory ?? null
-  }))
+  const gpu = siGpu.map((g) => {
+    const lhmGpuTemp = lhmData?.gpu?.['GPU Core'] ?? lhmData?.gpu?.['GPU Hot Spot']
+    return {
+      model: g.model || 'Unknown GPU',
+      vramTotal: g.vram || 0,
+      vramUsed: g.memoryUsed || 0,
+      temperature: nvidiaGpu?.temp ?? lhmGpuTemp ?? g.temperatureGpu ?? null,
+      load: nvidiaGpu?.load ?? g.utilizationGpu ?? null,
+      memControllerLoad: nvidiaGpu?.memLoad ?? g.utilizationMemory ?? null,
+      powerDraw: nvidiaGpu?.power ?? g.powerDraw ?? null,
+      coreClock: nvidiaGpu?.coreClock ?? g.clockCore ?? null,
+      memoryClock: nvidiaGpu?.memClock ?? g.clockMemory ?? null
+    }
+  })
 
   // Network totals
   const totalRx = networkStats.reduce((sum, n) => sum + (n.rx_bytes || 0), 0)
@@ -238,12 +252,12 @@ async function collectStats(): Promise<SystemStats> {
 export async function startSystemMonitor(window: BrowserWindow): Promise<void> {
   mainWindowRef = window
 
-  // Try to start LHM for accurate CPU temperature (requires admin)
-  startLhmProcess().then((started) => {
+  // Start LHM sensor reader for accurate CPU temperature
+  startLhmSensor().then((started) => {
     if (started) {
-      console.log('LibreHardwareMonitor started successfully')
+      console.log('LHM sensor reader active - accurate CPU temperature available')
     } else {
-      console.log('LibreHardwareMonitor not available, using fallback temperature')
+      console.log('LHM sensor not available - using thermal zone fallback')
     }
   })
 
@@ -265,7 +279,7 @@ export function stopSystemMonitor(): void {
     intervalId = null
   }
   mainWindowRef = null
-  stopLhmProcess()
+  stopLhmSensor()
 }
 
 export async function getStaticInfo() {
