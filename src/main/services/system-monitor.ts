@@ -6,28 +6,40 @@ import { exec } from 'child_process'
 let intervalId: ReturnType<typeof setInterval> | null = null
 let mainWindowRef: BrowserWindow | null = null
 
-// Fallback: read CPU temp via PowerShell thermal zone (Windows only, async)
+// Read CPU temp: try LibreHardwareMonitor WMI first, then thermal zone fallback
 function getCpuTempFallback(): Promise<number | null> {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') {
       resolve(null)
       return
     }
+    // Try LibreHardwareMonitor WMI first (requires LHM to be running)
     exec(
-      'powershell -Command "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation -Namespace root/cimv2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Temperature"',
+      'powershell -Command "Get-CimInstance -Namespace root/LibreHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Where-Object { $_.SensorType -eq \'Temperature\' -and $_.Name -like \'CPU Core*\' } | Select-Object -First 1 -ExpandProperty Value"',
       { timeout: 5000 },
       (err, stdout) => {
-        if (err || !stdout) {
-          resolve(null)
+        const val = stdout ? parseFloat(stdout.trim()) : NaN
+        if (!err && !isNaN(val) && val > 0) {
+          resolve(Math.round(val))
           return
         }
-        const match = stdout.match(/(\d+)/)
-        if (match) {
-          // Value is in tenths of degrees Celsius
-          resolve(Math.round(parseInt(match[1]) / 10))
-        } else {
-          resolve(null)
-        }
+        // Fallback: thermal zone
+        exec(
+          'powershell -Command "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation -Namespace root/cimv2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Temperature"',
+          { timeout: 5000 },
+          (err2, stdout2) => {
+            if (err2 || !stdout2) {
+              resolve(null)
+              return
+            }
+            const match = stdout2.match(/(\d+)/)
+            if (match) {
+              resolve(Math.round(parseInt(match[1]) / 10))
+            } else {
+              resolve(null)
+            }
+          }
+        )
       }
     )
   })
