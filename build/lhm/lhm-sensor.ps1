@@ -38,13 +38,10 @@ try {
             break
         }
 
-        # Force sensor updates
-        for ($i = 0; $i -lt 2; $i++) {
-            foreach ($h in $computer.Hardware) {
-                $h.Update()
-                foreach ($s in $h.SubHardware) { $s.Update() }
-            }
-            Start-Sleep -Milliseconds 200
+        # Single sensor update pass
+        foreach ($h in $computer.Hardware) {
+            $h.Update()
+            foreach ($s in $h.SubHardware) { $s.Update() }
         }
 
         # Collect temperatures
@@ -72,7 +69,8 @@ try {
         $result | ConvertTo-Json -Compress | Out-File -FilePath $tempPath -Encoding UTF8 -Force
         Move-Item -Path $tempPath -Destination $OutputPath -Force
 
-        Start-Sleep -Seconds 2
+        # Poll every 5 seconds (reduces CPU usage)
+        Start-Sleep -Seconds 5
     }
 } finally {
     $computer.Close()

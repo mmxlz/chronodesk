@@ -1,6 +1,7 @@
 import { BrowserWindow, Tray, Menu, nativeImage, app } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { getStore } from './store'
 
 let tray: Tray | null = null
 
@@ -73,8 +74,12 @@ export function createTray(mainWindow: BrowserWindow): Tray {
 
   mainWindow.on('close', (event) => {
     if (!(app as any).isQuitting) {
-      event.preventDefault()
-      mainWindow.hide()
+      const store = getStore()
+      const settings = store.get('settings') as { minimizeToTray?: boolean } | undefined
+      if (settings?.minimizeToTray !== false) {
+        event.preventDefault()
+        mainWindow.hide()
+      }
     }
   })
 

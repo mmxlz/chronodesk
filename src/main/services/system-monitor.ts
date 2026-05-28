@@ -93,7 +93,7 @@ function stopLhmSensor(): void {
 // Cached LHM sensor data (avoid reading file every 2s)
 let lhmCache: { cpu: Record<string, number>; gpu: Record<string, number> } | null = null
 let lhmCacheTime = 0
-const LHM_CACHE_TTL = 4000 // 4 seconds
+const LHM_CACHE_TTL = 6000 // 6 seconds (LHM script polls every 5s)
 
 function readLhmSensors(): { cpu: Record<string, number>; gpu: Record<string, number> } | null {
   const now = Date.now()
@@ -113,7 +113,7 @@ function readLhmSensors(): { cpu: Record<string, number>; gpu: Record<string, nu
 // Cached thermal zone temperature (avoid spawning PowerShell every 2s)
 let thermalZoneCache: number | null = null
 let thermalZoneCacheTime = 0
-const THERMAL_ZONE_TTL = 10000 // 10 seconds
+const THERMAL_ZONE_TTL = 15000 // 15 seconds
 
 // Read CPU temp from thermal zone (cached)
 function getCpuTempFallback(): Promise<number | null> {
@@ -153,7 +153,7 @@ function getCpuTempFallback(): Promise<number | null> {
 // Cached nvidia-smi data
 let nvidiaCache: { load: number; memLoad: number; temp: number; power: number; coreClock: number; memClock: number } | null = null
 let nvidiaCacheTime = 0
-const NVIDIA_CACHE_TTL = 3000 // 3 seconds
+const NVIDIA_CACHE_TTL = 5000 // 5 seconds
 
 // Get GPU info via nvidia-smi (cached)
 function getNvidiaGpu(): Promise<{ load: number; memLoad: number; temp: number; power: number; coreClock: number; memClock: number } | null> {
@@ -302,7 +302,7 @@ export async function startSystemMonitor(window: BrowserWindow): Promise<void> {
         console.error('Failed to collect system stats:', err)
       }
     }
-  }, 2000)
+  }, 5000)
 }
 
 export function stopSystemMonitor(): void {
