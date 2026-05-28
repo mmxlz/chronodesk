@@ -29,6 +29,9 @@ linux:
       arch: [x64]
   icon: build/icon.png
   category: Utility
+extraResources:
+  - from: build/lhm
+    to: lhm
 nsis:
   oneClick: false
   perMachine: false

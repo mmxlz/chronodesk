@@ -1,10 +1,95 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, app } from 'electron'
 import si from 'systeminformation'
 import { SystemStats } from '../../renderer/types/monitor'
-import { exec } from 'child_process'
+import { exec, spawn, ChildProcess } from 'child_process'
+import path from 'path'
 
 let intervalId: ReturnType<typeof setInterval> | null = null
 let mainWindowRef: BrowserWindow | null = null
+let lhmProcess: ChildProcess | null = null
+let lhmStarted = false
+
+// Find bundled LHM executable
+function getLhmPath(): string {
+  const isDev = !app.isPackaged
+  if (isDev) {
+    return path.join(__dirname, '..', '..', '..', 'build', 'lhm', 'LibreHardwareMonitor.exe')
+  }
+  return path.join(process.resourcesPath, 'lhm', 'LibreHardwareMonitor.exe')
+}
+
+// Check if LHM WMI namespace is already available (user may have LHM running)
+function checkLhmWmiAvailable(): Promise<boolean> {
+  return new Promise((resolve) => {
+    exec(
+      'powershell -Command "Get-CimInstance -Namespace root/LibreHardwareMonitor -ClassName Sensor -ErrorAction SilentlyContinue | Select-Object -First 1 | Out-Null; if($?) { exit 0 } else { exit 1 }"',
+      { timeout: 5000 },
+      (err) => {
+        resolve(!err)
+      }
+    )
+  })
+}
+
+// Start bundled LHM with admin privileges
+function startLhmProcess(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const lhmPath = getLhmPath()
+
+    // Check if already running (WMI namespace available)
+    checkLhmWmiAvailable().then((available) => {
+      if (available) {
+        lhmStarted = true
+        resolve(true)
+        return
+      }
+
+      // Start LHM with admin privileges via PowerShell
+      const psCmd = `Start-Process -FilePath '${lhmPath}' -WindowStyle Hidden -Verb RunAs -PassThru | Out-Null`
+      const child = exec(
+        `powershell -Command "${psCmd}"`,
+        { timeout: 10000 },
+        (err) => {
+          if (err) {
+            console.warn('Failed to start LHM (user may have denied admin):', err.message)
+            resolve(false)
+            return
+          }
+          // Wait for WMI namespace to become available
+          let retries = 0
+          const maxRetries = 10
+          const checkInterval = setInterval(() => {
+            retries++
+            checkLhmWmiAvailable().then((available) => {
+              if (available || retries >= maxRetries) {
+                clearInterval(checkInterval)
+                lhmStarted = available
+                resolve(available)
+              }
+            })
+          }, 1000)
+        }
+      )
+
+      // Store reference to kill later
+      lhmProcess = child
+    })
+  })
+}
+
+// Kill bundled LHM process
+function stopLhmProcess(): void {
+  if (lhmProcess) {
+    try {
+      // Kill LHM and its child processes
+      exec('powershell -Command "Get-Process LibreHardwareMonitor -ErrorAction SilentlyContinue | Stop-Process -Force"', { timeout: 3000 })
+    } catch {
+      // ignore
+    }
+    lhmProcess = null
+  }
+  lhmStarted = false
+}
 
 // Read CPU temp: try LibreHardwareMonitor WMI first, then thermal zone fallback
 function getCpuTempFallback(): Promise<number | null> {
@@ -150,8 +235,17 @@ async function collectStats(): Promise<SystemStats> {
   }
 }
 
-export function startSystemMonitor(window: BrowserWindow): void {
+export async function startSystemMonitor(window: BrowserWindow): Promise<void> {
   mainWindowRef = window
+
+  // Try to start LHM for accurate CPU temperature (requires admin)
+  startLhmProcess().then((started) => {
+    if (started) {
+      console.log('LibreHardwareMonitor started successfully')
+    } else {
+      console.log('LibreHardwareMonitor not available, using fallback temperature')
+    }
+  })
 
   intervalId = setInterval(async () => {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
@@ -171,6 +265,7 @@ export function stopSystemMonitor(): void {
     intervalId = null
   }
   mainWindowRef = null
+  stopLhmProcess()
 }
 
 export async function getStaticInfo() {
