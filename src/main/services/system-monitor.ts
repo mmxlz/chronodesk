@@ -33,8 +33,37 @@ function getCpuTempFallback(): Promise<number | null> {
   })
 }
 
+// Get GPU info via nvidia-smi (more accurate than systeminformation)
+function getNvidiaGpu(): Promise<{ load: number; memLoad: number; temp: number; power: number; coreClock: number; memClock: number } | null> {
+  return new Promise((resolve) => {
+    exec(
+      'nvidia-smi --query-gpu=utilization.gpu,utilization.memory,temperature.gpu,power.draw,clocks.current.graphics,clocks.current.memory --format=csv,noheader',
+      { timeout: 5000 },
+      (err, stdout) => {
+        if (err || !stdout) {
+          resolve(null)
+          return
+        }
+        const parts = stdout.trim().split(',').map(s => parseFloat(s))
+        if (parts.length >= 6 && !isNaN(parts[0])) {
+          resolve({
+            load: parts[0],
+            memLoad: parts[1],
+            temp: parts[2],
+            power: parts[3],
+            coreClock: parts[4],
+            memClock: parts[5]
+          })
+        } else {
+          resolve(null)
+        }
+      }
+    )
+  })
+}
+
 async function collectStats(): Promise<SystemStats> {
-  const [cpuLoad, mem, fsSize, networkStats, cpuTemp, processes, gpuData, time] =
+  const [cpuLoad, mem, fsSize, networkStats, cpuTemp, processes, gpuData, time, nvidiaGpu] =
     await Promise.all([
       si.currentLoad(),
       si.mem(),
@@ -43,7 +72,8 @@ async function collectStats(): Promise<SystemStats> {
       si.cpuTemperature().catch(() => ({ main: null })),
       si.processes().catch(() => ({ all: 0 })),
       si.graphics().catch(() => ({ controllers: [] })),
-      si.time()
+      si.time(),
+      getNvidiaGpu()
     ])
 
   // CPU temperature: try systeminformation first, then PowerShell fallback
@@ -52,20 +82,21 @@ async function collectStats(): Promise<SystemStats> {
     cpuTempValue = await getCpuTempFallback()
   }
 
-  // GPU info: filter out virtual adapters (no VRAM and no temp/load)
-  const gpu = (gpuData.controllers || [])
+  // GPU info: prefer nvidia-smi, fallback to systeminformation
+  const siGpu = (gpuData.controllers || [])
     .filter((g) => g.vram > 0 || g.utilizationGpu != null || g.temperatureGpu != null)
-    .map((g) => ({
-      model: g.model || 'Unknown GPU',
-      vramTotal: g.vram || 0,
-      vramUsed: g.memoryUsed || 0,
-      temperature: g.temperatureGpu ?? null,
-      load: g.utilizationGpu ?? null,
-      memControllerLoad: g.utilizationMemory ?? null,
-      powerDraw: g.powerDraw ?? null,
-      coreClock: g.clockCore ?? null,
-      memoryClock: g.clockMemory ?? null
-    }))
+
+  const gpu = siGpu.map((g) => ({
+    model: g.model || 'Unknown GPU',
+    vramTotal: g.vram || 0,
+    vramUsed: g.memoryUsed || 0,
+    temperature: nvidiaGpu?.temp ?? g.temperatureGpu ?? null,
+    load: nvidiaGpu?.load ?? g.utilizationGpu ?? null,
+    memControllerLoad: nvidiaGpu?.memLoad ?? g.utilizationMemory ?? null,
+    powerDraw: nvidiaGpu?.power ?? g.powerDraw ?? null,
+    coreClock: nvidiaGpu?.coreClock ?? g.clockCore ?? null,
+    memoryClock: nvidiaGpu?.memClock ?? g.clockMemory ?? null
+  }))
 
   // Network totals
   const totalRx = networkStats.reduce((sum, n) => sum + (n.rx_bytes || 0), 0)
