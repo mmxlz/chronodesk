@@ -6,7 +6,7 @@ import { exec } from 'child_process'
 let intervalId: ReturnType<typeof setInterval> | null = null
 let mainWindowRef: BrowserWindow | null = null
 
-// Fallback: read CPU temp via wmic (Windows only, async)
+// Fallback: read CPU temp via PowerShell thermal zone (Windows only, async)
 function getCpuTempFallback(): Promise<number | null> {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') {
@@ -14,16 +14,17 @@ function getCpuTempFallback(): Promise<number | null> {
       return
     }
     exec(
-      'wmic /namespace:\\\\root\\wmi PATH MSAcpi_ThermalZoneTemperature get CurrentTemperature /value',
+      'powershell -Command "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation -Namespace root/cimv2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Temperature"',
       { timeout: 5000 },
       (err, stdout) => {
         if (err || !stdout) {
           resolve(null)
           return
         }
-        const match = stdout.match(/CurrentTemperature=(\d+)/)
+        const match = stdout.match(/(\d+)/)
         if (match) {
-          resolve(Math.round(parseInt(match[1]) / 10 - 273.15))
+          // Value is in tenths of degrees Celsius
+          resolve(Math.round(parseInt(match[1]) / 10))
         } else {
           resolve(null)
         }
