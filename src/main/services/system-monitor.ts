@@ -90,18 +90,32 @@ function stopLhmSensor(): void {
   } catch {}
 }
 
-// Read cached LHM sensor data
+// Cached LHM sensor data (avoid reading file every 2s)
+let lhmCache: { cpu: Record<string, number>; gpu: Record<string, number> } | null = null
+let lhmCacheTime = 0
+const LHM_CACHE_TTL = 4000 // 4 seconds
+
 function readLhmSensors(): { cpu: Record<string, number>; gpu: Record<string, number> } | null {
+  const now = Date.now()
+  if (now - lhmCacheTime < LHM_CACHE_TTL && lhmCache) return lhmCache
+
   if (!lhmSensorPath || !fs.existsSync(lhmSensorPath)) return null
   try {
     const data = fs.readFileSync(lhmSensorPath, 'utf-8')
-    return JSON.parse(data)
+    lhmCache = JSON.parse(data)
+    lhmCacheTime = now
+    return lhmCache
   } catch {
     return null
   }
 }
 
-// Read CPU temp: try LHM sensor file first, then thermal zone fallback
+// Cached thermal zone temperature (avoid spawning PowerShell every 2s)
+let thermalZoneCache: number | null = null
+let thermalZoneCacheTime = 0
+const THERMAL_ZONE_TTL = 10000 // 10 seconds
+
+// Read CPU temp from thermal zone (cached)
 function getCpuTempFallback(): Promise<number | null> {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') {
@@ -109,60 +123,69 @@ function getCpuTempFallback(): Promise<number | null> {
       return
     }
 
-    // Try LHM sensor data first (written by PowerShell script)
-    const lhmData = readLhmSensors()
-    if (lhmData?.cpu) {
-      // Prefer "Core Max" or "CPU Package", fall back to first available
-      const temp = lhmData.cpu['Core Max'] ?? lhmData.cpu['CPU Package'] ?? Object.values(lhmData.cpu)[0]
-      if (temp && temp > 0) {
-        resolve(Math.round(temp))
-        return
-      }
+    const now = Date.now()
+    if (now - thermalZoneCacheTime < THERMAL_ZONE_TTL) {
+      resolve(thermalZoneCache)
+      return
     }
 
-    // Fallback: thermal zone
     exec(
       'powershell -NoProfile -Command "Get-CimInstance -ClassName Win32_PerfFormattedData_Counters_ThermalZoneInformation -Namespace root/cimv2 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Temperature"',
       { timeout: 5000 },
       (err, stdout) => {
         if (err || !stdout) {
-          resolve(null)
+          resolve(thermalZoneCache)
           return
         }
         const match = stdout.match(/(\d+)/)
         if (match) {
-          resolve(Math.round(parseInt(match[1]) / 10))
+          thermalZoneCache = Math.round(parseInt(match[1]) / 10)
+          thermalZoneCacheTime = now
+          resolve(thermalZoneCache)
         } else {
-          resolve(null)
+          resolve(thermalZoneCache)
         }
       }
     )
   })
 }
 
-// Get GPU info via nvidia-smi (more accurate than systeminformation)
+// Cached nvidia-smi data
+let nvidiaCache: { load: number; memLoad: number; temp: number; power: number; coreClock: number; memClock: number } | null = null
+let nvidiaCacheTime = 0
+const NVIDIA_CACHE_TTL = 3000 // 3 seconds
+
+// Get GPU info via nvidia-smi (cached)
 function getNvidiaGpu(): Promise<{ load: number; memLoad: number; temp: number; power: number; coreClock: number; memClock: number } | null> {
   return new Promise((resolve) => {
+    const now = Date.now()
+    if (now - nvidiaCacheTime < NVIDIA_CACHE_TTL && nvidiaCache) {
+      resolve(nvidiaCache)
+      return
+    }
+
     exec(
       'nvidia-smi --query-gpu=utilization.gpu,utilization.memory,temperature.gpu,power.draw,clocks.current.graphics,clocks.current.memory --format=csv,noheader',
       { timeout: 5000 },
       (err, stdout) => {
         if (err || !stdout) {
-          resolve(null)
+          resolve(nvidiaCache)
           return
         }
         const parts = stdout.trim().split(',').map(s => parseFloat(s))
         if (parts.length >= 6 && !isNaN(parts[0])) {
-          resolve({
+          nvidiaCache = {
             load: parts[0],
             memLoad: parts[1],
             temp: parts[2],
             power: parts[3],
             coreClock: parts[4],
             memClock: parts[5]
-          })
+          }
+          nvidiaCacheTime = now
+          resolve(nvidiaCache)
         } else {
-          resolve(null)
+          resolve(nvidiaCache)
         }
       }
     )
@@ -183,14 +206,23 @@ async function collectStats(): Promise<SystemStats> {
       getNvidiaGpu()
     ])
 
-  // CPU temperature: try systeminformation first, then LHM/PowerShell fallback
-  let cpuTempValue = cpuTemp.main ?? null
+  // CPU temperature: prefer LHM (accurate), then si, then thermal zone
+  const lhmData = readLhmSensors()
+  let cpuTempValue: number | null = null
+  if (lhmData?.cpu) {
+    const lhmCpuTemp = lhmData.cpu['Core Max'] ?? lhmData.cpu['CPU Package'] ?? Object.values(lhmData.cpu)[0]
+    if (lhmCpuTemp && lhmCpuTemp > 0) {
+      cpuTempValue = Math.round(lhmCpuTemp)
+    }
+  }
+  if (cpuTempValue === null) {
+    cpuTempValue = cpuTemp.main ?? null
+  }
   if (cpuTempValue === null) {
     cpuTempValue = await getCpuTempFallback()
   }
 
   // GPU info: prefer nvidia-smi, fallback to LHM sensor, then systeminformation
-  const lhmData = readLhmSensors()
   const siGpu = (gpuData.controllers || [])
     .filter((g) => g.vram > 0 || g.utilizationGpu != null || g.temperatureGpu != null)
 
