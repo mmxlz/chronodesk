@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { SystemStats } from '../renderer/types/monitor'
+import { SystemStats } from '../shared/monitor'
 
 const api = {
   // System

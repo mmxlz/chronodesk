@@ -1,6 +1,6 @@
 import { BrowserWindow, app } from 'electron'
 import si from 'systeminformation'
-import { SystemStats } from '../../renderer/types/monitor'
+import { SystemStats } from '../../shared/monitor'
 import { exec, spawn, ChildProcess } from 'child_process'
 import path from 'path'
 import fs from 'fs'
@@ -9,7 +9,186 @@ import os from 'os'
 let intervalId: ReturnType<typeof setInterval> | null = null
 let mainWindowRef: BrowserWindow | null = null
 let lhmProcess: ChildProcess | null = null
+let perfProcess: ChildProcess | null = null
 let lhmSensorPath: string | null = null
+let isCollecting = false
+
+const MONITOR_INTERVAL = 2000
+const PROCESS_CACHE_TTL = 30000
+const DISK_CACHE_TTL = 30000
+const GRAPHICS_CACHE_TTL = 10000
+const SI_TEMP_CACHE_TTL = 10000
+
+type LhmSensorData = {
+  cpu: Record<string, number>
+  gpu: Record<string, number>
+  timestamp?: string
+}
+
+type PerfMetrics = {
+  cpuUtility: number | null
+  gpuLoad: number | null
+}
+
+let perfHeaders: string[] = []
+let perfMetrics: PerfMetrics = {
+  cpuUtility: null,
+  gpuLoad: null
+}
+let previousNetworkSample: {
+  time: number
+  totalRx: number
+  totalTx: number
+} | null = null
+let previousNetworkRates = {
+  rx_sec: 0,
+  tx_sec: 0
+}
+
+function roundPercent(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+function parsePerfCsvLine(line: string): string[] {
+  const values: string[] = []
+  let value = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      values.push(value)
+      value = ''
+    } else {
+      value += char
+    }
+  }
+  values.push(value)
+  return values
+}
+
+function updatePerfMetrics(values: string[]): void {
+  if (perfHeaders.length === 0 || values.length < 2) return
+
+  let cpuUtility: number | null = null
+  const gpuEngineTotals = new Map<string, number>()
+
+  for (let i = 1; i < values.length && i < perfHeaders.length; i++) {
+    const header = perfHeaders[i]
+    const value = Number.parseFloat(values[i])
+    if (!Number.isFinite(value)) continue
+
+    if (header.includes('\\Processor Information(_Total)\\% Processor Utility')) {
+      cpuUtility = Math.max(0, Math.min(100, value))
+      continue
+    }
+
+    if (header.includes('\\GPU Engine(') && header.includes('\\Utilization Percentage')) {
+      const match = header.match(/engtype_([^)\\]+)/)
+      const engineType = match?.[1] ?? 'Other'
+      gpuEngineTotals.set(engineType, (gpuEngineTotals.get(engineType) ?? 0) + value)
+    }
+  }
+
+  const gpuLoad =
+    gpuEngineTotals.size > 0
+      ? Math.max(...Array.from(gpuEngineTotals.values()).map((value) => Math.min(100, value)))
+      : null
+
+  perfMetrics = {
+    cpuUtility: cpuUtility !== null ? roundPercent(cpuUtility) : perfMetrics.cpuUtility,
+    gpuLoad: gpuLoad !== null ? roundPercent(gpuLoad) : perfMetrics.gpuLoad
+  }
+}
+
+function startPerformanceCounters(): void {
+  if (process.platform !== 'win32' || perfProcess) return
+
+  perfProcess = spawn(
+    'typeperf.exe',
+    [
+      '\\Processor Information(_Total)\\% Processor Utility',
+      '\\GPU Engine(*)\\Utilization Percentage',
+      '-si',
+      '2'
+    ],
+    { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }
+  )
+
+  perfProcess.stdout?.setEncoding('utf8')
+  let buffer = ''
+  perfProcess.stdout?.on('data', (chunk: string) => {
+    buffer += chunk
+    const lines = buffer.split(/\r?\n/)
+    buffer = lines.pop() ?? ''
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim()
+      if (!line || line.startsWith('Exiting') || line.startsWith('The command')) continue
+
+      const values = parsePerfCsvLine(line)
+      if (values[0] === '(PDH-CSV 4.0)') {
+        perfHeaders = values
+      } else if (perfHeaders.length > 0) {
+        updatePerfMetrics(values)
+      }
+    }
+  })
+
+  perfProcess.on('exit', () => {
+    perfProcess = null
+    perfHeaders = []
+  })
+}
+
+function stopPerformanceCounters(): void {
+  if (perfProcess && !perfProcess.killed) {
+    perfProcess.kill()
+  }
+  perfProcess = null
+  perfHeaders = []
+}
+
+function getFallbackCpuLoad(): { usage: number; cores: number[] } {
+  const cpus = os.cpus()
+  return {
+    usage: perfMetrics.cpuUtility ?? 0,
+    cores: cpus.map(() => perfMetrics.cpuUtility ?? 0)
+  }
+}
+
+function getNetworkRates(networkStats: Awaited<ReturnType<typeof si.networkStats>>) {
+  const now = Date.now()
+  const totalRx = networkStats.reduce((sum, n) => sum + (n.rx_bytes || 0), 0)
+  const totalTx = networkStats.reduce((sum, n) => sum + (n.tx_bytes || 0), 0)
+
+  if (!previousNetworkSample) {
+    previousNetworkSample = { time: now, totalRx, totalTx }
+    return {
+      rx_sec: 0,
+      tx_sec: 0,
+      totalRx,
+      totalTx
+    }
+  }
+
+  const elapsedSeconds = Math.max(0.1, (now - previousNetworkSample.time) / 1000)
+  const rxDelta = Math.max(0, totalRx - previousNetworkSample.totalRx)
+  const txDelta = Math.max(0, totalTx - previousNetworkSample.totalTx)
+  previousNetworkRates = {
+    rx_sec: rxDelta / elapsedSeconds,
+    tx_sec: txDelta / elapsedSeconds
+  }
+  previousNetworkSample = { time: now, totalRx, totalTx }
+
+  return {
+    ...previousNetworkRates,
+    totalRx,
+    totalTx
+  }
+}
 
 // Find bundled LHM directory
 function getLhmDir(): string {
@@ -20,56 +199,52 @@ function getLhmDir(): string {
   return path.join(process.resourcesPath, 'lhm')
 }
 
-// Start LHM sensor reader PowerShell script with admin
+// Start LHM sensor reader PowerShell script. If ChronoDesk is elevated,
+// the child process inherits that token without a second UAC prompt.
 function startLhmSensor(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const lhmDir = getLhmDir()
-    const scriptPath = path.join(lhmDir, 'lhm-sensor.ps1')
+  const lhmDir = getLhmDir()
+  const scriptPath = path.join(lhmDir, 'lhm-sensor.ps1')
 
-    if (!fs.existsSync(scriptPath)) {
-      console.warn('LHM sensor script not found:', scriptPath)
-      resolve(false)
-      return
+  if (!fs.existsSync(scriptPath)) {
+    console.warn('LHM sensor script not found:', scriptPath)
+    return Promise.resolve(false)
+  }
+
+  const outputPath = path.join(os.tmpdir(), 'chronodesk-sensors.json')
+  const sentinelPath = path.join(os.tmpdir(), 'chronodesk-sensors.running')
+  lhmSensorPath = outputPath
+
+  try { fs.unlinkSync(sentinelPath) } catch {}
+  try { fs.unlinkSync(outputPath) } catch {}
+
+  lhmProcess = spawn(
+    'powershell.exe',
+    ['-ExecutionPolicy', 'Bypass', '-NoProfile', '-File', scriptPath, '-OutputPath', outputPath],
+    { windowsHide: true, stdio: 'ignore' }
+  )
+
+  lhmProcess.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.warn(`LHM sensor reader exited with code ${code}`)
     }
+    lhmProcess = null
+  })
 
-    const outputPath = path.join(os.tmpdir(), 'chronodesk-sensors.json')
-    const sentinelPath = path.join(os.tmpdir(), 'chronodesk-sensors.running')
-    lhmSensorPath = outputPath
-
-    // Clean up any previous run
-    try { fs.unlinkSync(sentinelPath) } catch {}
-    try { fs.unlinkSync(outputPath) } catch {}
-
-    // Start PowerShell with admin privileges
-    const psCmd = `Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -NoProfile -File "${scriptPath}" -OutputPath "${outputPath}"' -Verb RunAs -WindowStyle Hidden`
-
-    exec(
-      `powershell -NoProfile -Command "${psCmd}"`,
-      { timeout: 10000 },
-      (err) => {
-        if (err) {
-          console.warn('Failed to start LHM sensor (admin denied):', err.message)
-          resolve(false)
-          return
-        }
-
-        // Wait for the sensor script to start producing data
-        let retries = 0
-        const maxRetries = 15
-        const check = setInterval(() => {
-          retries++
-          if (fs.existsSync(outputPath)) {
-            clearInterval(check)
-            console.log('LHM sensor reader started successfully')
-            resolve(true)
-          } else if (retries >= maxRetries) {
-            clearInterval(check)
-            console.warn('LHM sensor reader did not start in time')
-            resolve(false)
-          }
-        }, 1000)
+  return new Promise((resolve) => {
+    let retries = 0
+    const maxRetries = 15
+    const check = setInterval(() => {
+      retries++
+      if (fs.existsSync(outputPath)) {
+        clearInterval(check)
+        console.log('LHM sensor reader started successfully')
+        resolve(true)
+      } else if (retries >= maxRetries) {
+        clearInterval(check)
+        console.warn('LHM sensor reader did not start in time')
+        resolve(false)
       }
-    )
+    }, 1000)
   })
 }
 
@@ -84,33 +259,33 @@ function stopLhmSensor(): void {
     }, 2000)
     lhmSensorPath = null
   }
-  // Kill any remaining PowerShell processes related to LHM
-  try {
-    exec('powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"CommandLine LIKE \'%lhm-sensor%\'\\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"', { timeout: 3000 })
-  } catch {}
-}
-
-// Cached LHM sensor data (avoid reading file every 2s)
-let lhmCache: { cpu: Record<string, number>; gpu: Record<string, number> } | null = null
-let lhmCacheTime = 0
-const LHM_CACHE_TTL = 6000 // 6 seconds (LHM script polls every 5s)
-
-function readLhmSensors(): { cpu: Record<string, number>; gpu: Record<string, number> } | null {
-  const now = Date.now()
-  if (now - lhmCacheTime < LHM_CACHE_TTL && lhmCache) return lhmCache
-
-  if (!lhmSensorPath || !fs.existsSync(lhmSensorPath)) return null
-  try {
-    const data = fs.readFileSync(lhmSensorPath, 'utf-8')
-    lhmCache = JSON.parse(data)
-    lhmCacheTime = now
-    return lhmCache
-  } catch {
-    return null
+  if (lhmProcess && !lhmProcess.killed) {
+    lhmProcess.kill()
+    lhmProcess = null
   }
 }
 
-// Cached thermal zone temperature (avoid spawning PowerShell every 2s)
+// Cached LHM sensor data. Refresh by file mtime instead of a time TTL so
+// a 5s app poll never skips a fresh 5s LHM write.
+let lhmCache: LhmSensorData | null = null
+let lhmCacheMtime = 0
+
+function readLhmSensors(): LhmSensorData | null {
+  if (!lhmSensorPath || !fs.existsSync(lhmSensorPath)) return lhmCache
+  try {
+    const stat = fs.statSync(lhmSensorPath)
+    if (lhmCache && stat.mtimeMs === lhmCacheMtime) return lhmCache
+
+    const data = fs.readFileSync(lhmSensorPath, 'utf-8').replace(/^\uFEFF/, '')
+    lhmCache = JSON.parse(data)
+    lhmCacheMtime = stat.mtimeMs
+    return lhmCache
+  } catch {
+    return lhmCache
+  }
+}
+
+// Cached thermal zone temperature (avoid spawning PowerShell every poll)
 let thermalZoneCache: number | null = null
 let thermalZoneCacheTime = 0
 const THERMAL_ZONE_TTL = 15000 // 15 seconds
@@ -150,81 +325,111 @@ function getCpuTempFallback(): Promise<number | null> {
   })
 }
 
-// Cached nvidia-smi data
-let nvidiaCache: { load: number; memLoad: number; temp: number; power: number; coreClock: number; memClock: number } | null = null
-let nvidiaCacheTime = 0
-const NVIDIA_CACHE_TTL = 5000 // 5 seconds
+let siTempCache: number | null = null
+let siTempCacheTime = 0
 
-// Get GPU info via nvidia-smi (cached)
-function getNvidiaGpu(): Promise<{ load: number; memLoad: number; temp: number; power: number; coreClock: number; memClock: number } | null> {
+function getSiCpuTemp(): Promise<number | null> {
   return new Promise((resolve) => {
     const now = Date.now()
-    if (now - nvidiaCacheTime < NVIDIA_CACHE_TTL && nvidiaCache) {
-      resolve(nvidiaCache)
+    if (now - siTempCacheTime < SI_TEMP_CACHE_TTL) {
+      resolve(siTempCache)
       return
     }
 
-    exec(
-      'nvidia-smi --query-gpu=utilization.gpu,utilization.memory,temperature.gpu,power.draw,clocks.current.graphics,clocks.current.memory --format=csv,noheader',
-      { timeout: 5000 },
-      (err, stdout) => {
-        if (err || !stdout) {
-          resolve(nvidiaCache)
-          return
-        }
-        const parts = stdout.trim().split(',').map(s => parseFloat(s))
-        if (parts.length >= 6 && !isNaN(parts[0])) {
-          nvidiaCache = {
-            load: parts[0],
-            memLoad: parts[1],
-            temp: parts[2],
-            power: parts[3],
-            coreClock: parts[4],
-            memClock: parts[5]
-          }
-          nvidiaCacheTime = now
-          resolve(nvidiaCache)
-        } else {
-          resolve(nvidiaCache)
-        }
-      }
-    )
+    si.cpuTemperature()
+      .then((temp) => {
+        siTempCache = temp.main ?? null
+        siTempCacheTime = now
+        resolve(siTempCache)
+      })
+      .catch(() => resolve(siTempCache))
   })
 }
 
-async function collectStats(): Promise<SystemStats> {
-  const [cpuLoad, mem, fsSize, networkStats, cpuTemp, processes, gpuData, time, nvidiaGpu] =
-    await Promise.all([
-      si.currentLoad(),
-      si.mem(),
-      si.fsSize(),
-      si.networkStats(),
-      si.cpuTemperature().catch(() => ({ main: null })),
-      si.processes().catch(() => ({ all: 0 })),
-      si.graphics().catch(() => ({ controllers: [] })),
-      si.time(),
-      getNvidiaGpu()
-    ])
+let processCountCache = 0
+let processCountCacheTime = 0
 
-  // CPU temperature: prefer LHM (accurate), then si, then thermal zone
-  const lhmData = readLhmSensors()
-  let cpuTempValue: number | null = null
+async function getProcessCount(): Promise<number> {
+  const now = Date.now()
+  if (now - processCountCacheTime < PROCESS_CACHE_TTL) return processCountCache
+
+  try {
+    const processes = await si.processes()
+    processCountCache = processes.all || processCountCache
+    processCountCacheTime = now
+  } catch {
+    processCountCacheTime = now
+  }
+  return processCountCache
+}
+
+let fsSizeCache: Awaited<ReturnType<typeof si.fsSize>> = []
+let fsSizeCacheTime = 0
+
+async function getFsSize() {
+  const now = Date.now()
+  if (now - fsSizeCacheTime < DISK_CACHE_TTL && fsSizeCache.length > 0) return fsSizeCache
+
+  try {
+    fsSizeCache = await si.fsSize()
+    fsSizeCacheTime = now
+  } catch {
+    fsSizeCacheTime = now
+  }
+  return fsSizeCache
+}
+
+let graphicsCache: Awaited<ReturnType<typeof si.graphics>> = { controllers: [], displays: [] }
+let graphicsCacheTime = 0
+
+async function getGraphics() {
+  const now = Date.now()
+  if (now - graphicsCacheTime < GRAPHICS_CACHE_TTL) return graphicsCache
+
+  try {
+    graphicsCache = await si.graphics()
+    graphicsCacheTime = now
+  } catch {
+    graphicsCacheTime = now
+  }
+  return graphicsCache
+}
+
+async function getCpuTemperature(lhmData: LhmSensorData | null): Promise<number | null> {
   if (lhmData?.cpu) {
-    const lhmCpuTemp = lhmData.cpu['Core Max'] ?? lhmData.cpu['CPU Package'] ?? Object.values(lhmData.cpu)[0]
+    const lhmCpuTemp =
+      lhmData.cpu['Core Max'] ??
+      lhmData.cpu['CPU Package'] ??
+      lhmData.cpu['Core Average'] ??
+      Object.values(lhmData.cpu).find((v) => v > 0)
+
     if (lhmCpuTemp && lhmCpuTemp > 0) {
-      cpuTempValue = Math.round(lhmCpuTemp)
+      return Math.round(lhmCpuTemp)
     }
   }
-  if (cpuTempValue === null) {
-    cpuTempValue = cpuTemp.main ?? null
-  }
-  if (cpuTempValue === null) {
-    cpuTempValue = await getCpuTempFallback()
-  }
 
-  // GPU info: prefer nvidia-smi, fallback to LHM sensor, then systeminformation
+  const siTemp = await getSiCpuTemp()
+  return siTemp ?? getCpuTempFallback()
+}
+
+async function collectStats(): Promise<SystemStats> {
+  const lhmData = readLhmSensors()
+  const cpuLoad = getFallbackCpuLoad()
+  const totalMemory = os.totalmem()
+  const freeMemory = os.freemem()
+  const usedMemory = Math.max(0, totalMemory - freeMemory)
+  const [networkStats, fsSize, processCount, gpuData, cpuTempValue] =
+    await Promise.all([
+      si.networkStats(),
+      getFsSize(),
+      getProcessCount(),
+      getGraphics(),
+      getCpuTemperature(lhmData)
+    ])
+
+  // GPU usage follows Windows Task Manager GPU Engine counters.
   const siGpu = (gpuData.controllers || [])
-    .filter((g) => g.vram > 0 || g.utilizationGpu != null || g.temperatureGpu != null)
+    .filter((g) => (g.vram ?? 0) > 0 || g.utilizationGpu != null || g.temperatureGpu != null)
 
   const gpu = siGpu.map((g) => {
     const lhmGpuTemp = lhmData?.gpu?.['GPU Core'] ?? lhmData?.gpu?.['GPU Hot Spot']
@@ -232,37 +437,33 @@ async function collectStats(): Promise<SystemStats> {
       model: g.model || 'Unknown GPU',
       vramTotal: g.vram || 0,
       vramUsed: g.memoryUsed || 0,
-      temperature: nvidiaGpu?.temp ?? lhmGpuTemp ?? g.temperatureGpu ?? null,
-      load: nvidiaGpu?.load ?? g.utilizationGpu ?? null,
-      memControllerLoad: nvidiaGpu?.memLoad ?? g.utilizationMemory ?? null,
-      powerDraw: nvidiaGpu?.power ?? g.powerDraw ?? null,
-      coreClock: nvidiaGpu?.coreClock ?? g.clockCore ?? null,
-      memoryClock: nvidiaGpu?.memClock ?? g.clockMemory ?? null
+      temperature: lhmGpuTemp ?? g.temperatureGpu ?? null,
+      load: perfMetrics.gpuLoad ?? g.utilizationGpu ?? null,
+      memControllerLoad: g.utilizationMemory ?? null,
+      powerDraw: g.powerDraw ?? null,
+      coreClock: g.clockCore ?? null,
+      memoryClock: g.clockMemory ?? null
     }
   })
 
-  // Network totals
-  const totalRx = networkStats.reduce((sum, n) => sum + (n.rx_bytes || 0), 0)
-  const totalTx = networkStats.reduce((sum, n) => sum + (n.tx_bytes || 0), 0)
-  const rx_sec = networkStats.reduce((sum, n) => sum + (n.rx_sec || 0), 0)
-  const tx_sec = networkStats.reduce((sum, n) => sum + (n.tx_sec || 0), 0)
+  const network = getNetworkRates(networkStats)
 
   return {
     cpu: {
-      usage: Math.round(cpuLoad.currentLoad * 100) / 100,
-      cores: cpuLoad.cpus.map((c) => Math.round(c.load * 100) / 100),
+      usage: cpuLoad.usage,
+      cores: cpuLoad.cores,
       temperature: cpuTempValue,
-      processCount: processes.all || 0,
+      processCount,
       speed: 0
     },
     memory: {
-      total: mem.total,
-      used: mem.used,
-      active: mem.active,
-      available: mem.available,
-      swapTotal: mem.swaptotal,
-      swapUsed: mem.swapused,
-      percentage: Math.round((mem.active / mem.total) * 10000) / 100
+      total: totalMemory,
+      used: usedMemory,
+      active: usedMemory,
+      available: freeMemory,
+      swapTotal: 0,
+      swapUsed: 0,
+      percentage: Math.round((usedMemory / totalMemory) * 10000) / 100
     },
     disk: fsSize.map((d) => ({
       mount: d.mount,
@@ -271,13 +472,13 @@ async function collectStats(): Promise<SystemStats> {
       percentage: Math.round(d.use * 100) / 100
     })),
     network: {
-      rx_sec,
-      tx_sec,
-      totalRx,
-      totalTx
+      rx_sec: network.rx_sec,
+      tx_sec: network.tx_sec,
+      totalRx: network.totalRx,
+      totalTx: network.totalTx
     },
     gpu,
-    uptime: time.uptime
+    uptime: os.uptime()
   }
 }
 
@@ -292,17 +493,27 @@ export async function startSystemMonitor(window: BrowserWindow): Promise<void> {
       console.log('LHM sensor not available - using thermal zone fallback')
     }
   })
+  startPerformanceCounters()
 
+  const publishStats = async () => {
+    if (isCollecting || !mainWindowRef || mainWindowRef.isDestroyed()) return
+    isCollecting = true
+    try {
+      const stats = await collectStats()
+      mainWindowRef.webContents.send('system:statsUpdate', stats)
+    } catch (err) {
+      console.error('Failed to collect system stats:', err)
+    } finally {
+      isCollecting = false
+    }
+  }
+
+  publishStats()
   intervalId = setInterval(async () => {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      try {
-        const stats = await collectStats()
-        mainWindowRef.webContents.send('system:statsUpdate', stats)
-      } catch (err) {
-        console.error('Failed to collect system stats:', err)
-      }
+      publishStats()
     }
-  }, 5000)
+  }, MONITOR_INTERVAL)
 }
 
 export function stopSystemMonitor(): void {
@@ -311,6 +522,7 @@ export function stopSystemMonitor(): void {
     intervalId = null
   }
   mainWindowRef = null
+  stopPerformanceCounters()
   stopLhmSensor()
 }
 

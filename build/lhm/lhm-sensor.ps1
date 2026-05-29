@@ -23,6 +23,31 @@ $computer = New-Object LibreHardwareMonitor.Hardware.Computer
 $computer.IsCpuEnabled = $true
 $computer.IsGpuEnabled = $true
 $computer.Open()
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Update-HardwareTree($hardware) {
+    $hardware.Update()
+    foreach ($subHardware in $hardware.SubHardware) {
+        Update-HardwareTree $subHardware
+    }
+}
+
+function Read-TemperatureSensors($hardware, $result) {
+    foreach ($s in $hardware.Sensors) {
+        if ($s.SensorType -eq 'Temperature' -and $s.Value -ne $null) {
+            $val = [math]::Round($s.Value, 1)
+            if ($hardware.HardwareType -like '*Cpu*') {
+                $result.cpu[$s.Name] = $val
+            } elseif ($hardware.HardwareType -like '*Gpu*') {
+                $result.gpu[$s.Name] = $val
+            }
+        }
+    }
+
+    foreach ($subHardware in $hardware.SubHardware) {
+        Read-TemperatureSensors $subHardware $result
+    }
+}
 
 # Wait for sensors to initialize
 Start-Sleep -Seconds 3
@@ -40,8 +65,7 @@ try {
 
         # Single sensor update pass
         foreach ($h in $computer.Hardware) {
-            $h.Update()
-            foreach ($s in $h.SubHardware) { $s.Update() }
+            Update-HardwareTree $h
         }
 
         # Collect temperatures
@@ -52,21 +76,13 @@ try {
         }
 
         foreach ($h in $computer.Hardware) {
-            foreach ($s in $h.Sensors) {
-                if ($s.SensorType -eq 'Temperature' -and $s.Value -ne $null) {
-                    $val = [math]::Round($s.Value, 1)
-                    if ($h.HardwareType -like '*Cpu*') {
-                        $result.cpu[$s.Name] = $val
-                    } elseif ($h.HardwareType -like '*Gpu*') {
-                        $result.gpu[$s.Name] = $val
-                    }
-                }
-            }
+            Read-TemperatureSensors $h $result
         }
 
         # Write to temp file then atomic rename (avoid partial reads)
         $tempPath = "$OutputPath.tmp"
-        $result | ConvertTo-Json -Compress | Out-File -FilePath $tempPath -Encoding UTF8 -Force
+        $json = $result | ConvertTo-Json -Compress
+        [System.IO.File]::WriteAllText($tempPath, $json, $utf8NoBom)
         Move-Item -Path $tempPath -Destination $OutputPath -Force
 
         # Poll every 5 seconds (reduces CPU usage)
