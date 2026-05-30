@@ -9,6 +9,14 @@ export default function GeneralSettings() {
     setAlwaysOnTop(newVal)
   }
 
+  const handleToggleMinimizeToTray = async () => {
+    const newVal = !minimizeToTray
+    setMinimizeToTray(newVal)
+    // Persist to main process store so tray.ts can read it
+    const settings = await window.api.storeGet<Record<string, unknown>>('settings')
+    await window.api.storeSet('settings', { ...settings, minimizeToTray: newVal })
+  }
+
   return (
     <div className="bg-surface rounded-xl p-4 space-y-4">
       <h3 className="text-sm font-medium">通用设置</h3>
@@ -39,7 +47,7 @@ export default function GeneralSettings() {
             <div className="text-xs text-text-secondary">关闭窗口时最小化到系统托盘</div>
           </div>
           <button
-            onClick={() => setMinimizeToTray(!minimizeToTray)}
+            onClick={handleToggleMinimizeToTray}
             className={`w-10 h-5 rounded-full relative transition-colors ${
               minimizeToTray ? 'bg-accent' : 'bg-border'
             }`}
@@ -58,7 +66,12 @@ export default function GeneralSettings() {
             <div className="text-xs text-text-secondary">系统启动时自动运行 ChronoDesk</div>
           </div>
           <button
-            onClick={() => setStartupWithOS(!startupWithOS)}
+            onClick={async () => {
+              const newVal = !startupWithOS
+              setStartupWithOS(newVal)
+              const settings = await window.api.storeGet<Record<string, unknown>>('settings')
+              await window.api.storeSet('settings', { ...settings, startupWithOS: newVal })
+            }}
             className={`w-10 h-5 rounded-full relative transition-colors ${
               startupWithOS ? 'bg-accent' : 'bg-border'
             }`}

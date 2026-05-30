@@ -33,6 +33,11 @@ const api = {
     ipcRenderer.on('sound:playFile', handler)
     return () => ipcRenderer.removeListener('sound:playFile', handler)
   },
+  onStoreFlush: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('store:flush', handler)
+    return () => ipcRenderer.removeListener('store:flush', handler)
+  },
 
   // App info
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),

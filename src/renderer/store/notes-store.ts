@@ -14,6 +14,11 @@ interface NotesState {
   hydrate: (data: Note[]) => void
 }
 
+function persistNotes(notes: Note[]) {
+  if (!window.api) return
+  window.api.storeSet('notes', notes).catch(console.error)
+}
+
 export const useNotesStore = create<NotesState>()((set, get) => ({
   notes: [],
   addNote: (x = 100, y = 100) => {
@@ -31,30 +36,39 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
       updatedAt: Date.now()
     }
     set((state) => ({ notes: [...state.notes, note] }))
+    persistNotes(get().notes)
     return id
   },
-  updateNote: (id, updates) =>
+  updateNote: (id, updates) => {
     set((state) => ({
       notes: state.notes.map((n) =>
         n.id === id ? { ...n, ...updates, updatedAt: Date.now() } : n
       )
-    })),
-  deleteNote: (id) =>
+    }))
+    persistNotes(get().notes)
+  },
+  deleteNote: (id) => {
     set((state) => ({
       notes: state.notes.filter((n) => n.id !== id)
-    })),
-  moveNote: (id, x, y) =>
+    }))
+    persistNotes(get().notes)
+  },
+  moveNote: (id, x, y) => {
     set((state) => ({
       notes: state.notes.map((n) =>
         n.id === id ? { ...n, x, y, updatedAt: Date.now() } : n
       )
-    })),
-  resizeNote: (id, width, height) =>
+    }))
+    persistNotes(get().notes)
+  },
+  resizeNote: (id, width, height) => {
     set((state) => ({
       notes: state.notes.map((n) =>
         n.id === id ? { ...n, width, height, updatedAt: Date.now() } : n
       )
-    })),
+    }))
+    persistNotes(get().notes)
+  },
   getNotesByDate: (date) => {
     return get().notes.filter((n) => n.attachedDate === date)
   },

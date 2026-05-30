@@ -1,0 +1,30 @@
+appId: com.chronodesk.lite
+productName: ChronoDesk Lite
+directories:
+  output: dist-lite
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!dist/**'
+  - '!dist-lite/**'
+  - '!build/lhm/**'
+  - '!src/*'
+  - '!{.eslintrc.cjs,.prettierrc}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!electron.vite.config.*'
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: '${productName}-${version}-Setup.${ext}'
+  forceCodeSigning: false
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 'ChronoDesk Lite'
+  deleteAppDataOnUninstall: false

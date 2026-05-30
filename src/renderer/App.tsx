@@ -10,6 +10,7 @@ import { getTheme } from '@/themes'
 import { formatDate } from '@/lib/formatters'
 import { playSound } from '@/lib/sounds'
 import { useSystemStats } from '@/features/monitor/useSystemStats'
+import { usePersistentStores } from '@/hooks/usePersistentStores'
 
 function getBackgroundStyle(
   bgType: BgType,
@@ -43,7 +44,9 @@ function getImageBgStyle(
   }
 }
 
-const viewIds: ViewId[] = ['clock', 'monitor', 'pomodoro', 'notes', 'settings']
+const viewIds: ViewId[] = __LIGHT_BUILD__
+  ? ['clock', 'pomodoro', 'notes', 'settings']
+  : ['clock', 'monitor', 'pomodoro', 'notes', 'settings']
 
 export default function App() {
   const currentTheme = useThemeStore((s) => s.currentTheme)
@@ -59,7 +62,8 @@ export default function App() {
   const setSelectedView = useSettingsStore((s) => s.setSelectedView)
   const toggleMiniMode = useSettingsStore((s) => s.toggleMiniMode)
 
-  useSystemStats()
+  usePersistentStores()
+  useSystemStats(!__LIGHT_BUILD__)
 
   const customColors = useThemeStore((s) => s.customColors)
 
@@ -85,21 +89,6 @@ export default function App() {
     [bgType, bgImage, bgImageSize, bgImageBlur, bgImageX, bgImageY]
   )
 
-  // Hydrate stores from electron-store on mount
-  useEffect(() => {
-    Promise.all([
-      window.api.storeGet('theme'),
-      window.api.storeGet('settings'),
-      window.api.storeGet('pomodoro'),
-      window.api.storeGet('notes')
-    ]).then(([theme, settings, pomodoro, notes]) => {
-      if (theme) useThemeStore.getState().hydrate(theme as any)
-      if (settings) useSettingsStore.getState().hydrate(settings as any)
-      if (pomodoro) usePomodoroStore.getState().hydrate(pomodoro as any)
-      if (notes) useNotesStore.getState().hydrate(notes as any[])
-    })
-  }, [])
-
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -107,7 +96,7 @@ export default function App() {
 
       // Ctrl+1~5: switch views
       const num = parseInt(e.key)
-      if (num >= 1 && num <= 5) {
+      if (num >= 1 && num <= viewIds.length) {
         e.preventDefault()
         setSelectedView(viewIds[num - 1])
         return

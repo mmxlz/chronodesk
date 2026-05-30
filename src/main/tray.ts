@@ -73,6 +73,8 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   })
 
   mainWindow.on('close', (event) => {
+    mainWindow.webContents.send('store:flush')
+
     if (!(app as any).isQuitting) {
       const store = getStore()
       const settings = store.get('settings') as { minimizeToTray?: boolean } | undefined

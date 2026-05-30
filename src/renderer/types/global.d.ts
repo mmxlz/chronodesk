@@ -16,6 +16,7 @@ declare global {
       showNotification: (title: string, body: string) => Promise<void>
       playSound: (name: string) => Promise<void>
       onPlaySoundFile: (callback: (path: string) => void) => () => void
+      onStoreFlush: (callback: () => void) => () => void
       getAppVersion: () => Promise<string>
       getUserDataPath: () => Promise<string>
     }

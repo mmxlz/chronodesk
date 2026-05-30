@@ -1,6 +1,7 @@
 node_modules/
 out/
 dist/
+dist-lite/
 *.log
 .DS_Store
 Thumbs.db

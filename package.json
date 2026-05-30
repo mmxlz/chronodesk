@@ -1,6 +1,6 @@
 {
   "name": "chronodesk",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Desktop clock with system monitor, pomodoro timer, and sticky notes",
   "main": "./out/main/index.js",
   "author": "ChronoDesk",
@@ -10,6 +10,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package:win": "electron-vite build && electron-builder --win",
+    "package:win:lite": "set CHRONODESK_LIGHT=1&& electron-vite build && electron-builder --win --config electron-builder.light.yml",
     "package:mac": "electron-vite build && electron-builder --mac",
     "package:linux": "electron-vite build && electron-builder --linux",
     "typecheck": "tsc --noEmit",

@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { useMonitorStore } from '@/store/monitor-store'
 
-export function useSystemStats() {
+export function useSystemStats(enabled = true) {
   const update = useMonitorStore((s) => s.update)
   const setStaticInfo = useMonitorStore((s) => s.setStaticInfo)
 
   useEffect(() => {
+    if (!enabled) return
+
     // Fetch static info once
     window.api.getStaticInfo().then(setStaticInfo).catch(console.error)
 
@@ -14,5 +16,5 @@ export function useSystemStats() {
       update(stats)
     })
     return unsubscribe
-  }, [update, setStaticInfo])
+  }, [enabled, update, setStaticInfo])
 }

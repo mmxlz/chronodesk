@@ -22,12 +22,16 @@ const navItems: NavItem[] = [
   { id: 'settings', label: '设置', icon: <FiSettings size={20} /> }
 ]
 
+const visibleNavItems = __LIGHT_BUILD__
+  ? navItems.filter((item) => item.id !== 'monitor')
+  : navItems
+
 export default function Sidebar() {
   const { selectedView, setSelectedView } = useSettingsStore()
 
   return (
     <div className="w-16 h-full flex flex-col items-center py-4 gap-1">
-      {navItems.map((item) => (
+      {visibleNavItems.map((item) => (
         <button
           key={item.id}
           onClick={() => setSelectedView(item.id)}

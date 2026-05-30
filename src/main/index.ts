@@ -10,7 +10,9 @@ app.whenReady().then(() => {
   mainWindow = createMainWindow()
   registerIpcHandlers(mainWindow)
   createTray(mainWindow)
-  startSystemMonitor(mainWindow)
+  if (!__LIGHT_BUILD__) {
+    startSystemMonitor(mainWindow)
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -18,7 +20,9 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  stopSystemMonitor()
+  if (!__LIGHT_BUILD__) {
+    stopSystemMonitor()
+  }
   if (process.platform !== 'darwin') {
     app.quit()
   }
@@ -29,6 +33,8 @@ app.on('activate', () => {
     mainWindow = createMainWindow()
     registerIpcHandlers(mainWindow)
     createTray(mainWindow)
-    startSystemMonitor(mainWindow)
+    if (!__LIGHT_BUILD__) {
+      startSystemMonitor(mainWindow)
+    }
   }
 })

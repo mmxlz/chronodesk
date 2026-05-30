@@ -15,7 +15,9 @@ const viewMap = {
 
 export default function PanelContainer() {
   const selectedView = useSettingsStore((s) => s.selectedView)
-  const View = viewMap[selectedView]
+  const View = __LIGHT_BUILD__ && selectedView === 'monitor'
+    ? ClockView
+    : viewMap[selectedView] ?? ClockView
 
   return (
     <div className="flex-1 h-full overflow-auto">

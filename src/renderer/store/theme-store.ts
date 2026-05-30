@@ -73,7 +73,37 @@ interface ThemeState {
   hydrate: (data: Partial<ThemeState>) => void
 }
 
-export const useThemeStore = create<ThemeState>()((set) => ({
+function persistTheme(state: ThemeState) {
+  if (!window.api) return
+  const {
+    setTheme,
+    setCustomColor,
+    setBgType,
+    setBgColor,
+    setBgGradient,
+    setBgImage,
+    setBgImageSize,
+    setBgImageBlur,
+    setBgImageX,
+    setBgImageY,
+    setClockFormat,
+    setShowSeconds,
+    setShowDate,
+    setClockSize,
+    setClockColor,
+    setClockFont,
+    setClockPosition,
+    setWorldClocks,
+    setCountdowns,
+    addCountdown,
+    removeCountdown,
+    hydrate,
+    ...data
+  } = state
+  window.api.storeSet('theme', data).catch(console.error)
+}
+
+export const useThemeStore = create<ThemeState>()((set, get) => ({
   currentTheme: 'dark',
   customColors: {},
 
@@ -97,28 +127,36 @@ export const useThemeStore = create<ThemeState>()((set) => ({
   worldClocks: [],
   countdowns: [],
 
-  setTheme: (name) => set({ currentTheme: name }),
-  setCustomColor: (key, value) =>
-    set((s) => ({ customColors: { ...s.customColors, [key]: value } })),
-  setBgType: (bgType) => set({ bgType }),
-  setBgColor: (bgColor) => set({ bgColor }),
-  setBgGradient: (bgGradient) => set({ bgGradient }),
-  setBgImage: (bgImage) => set({ bgImage }),
-  setBgImageSize: (bgImageSize) => set({ bgImageSize }),
-  setBgImageBlur: (bgImageBlur) => set({ bgImageBlur }),
-  setBgImageX: (bgImageX) => set({ bgImageX }),
-  setBgImageY: (bgImageY) => set({ bgImageY }),
-  setClockFormat: (clockFormat) => set({ clockFormat }),
-  setShowSeconds: (showSeconds) => set({ showSeconds }),
-  setShowDate: (showDate) => set({ showDate }),
-  setClockSize: (clockSize) => set({ clockSize }),
-  setClockColor: (clockColor) => set({ clockColor }),
-  setClockFont: (clockFont) => set({ clockFont }),
-  setClockPosition: (clockPosition) => set({ clockPosition }),
-  setWorldClocks: (worldClocks) => set({ worldClocks }),
-  setCountdowns: (countdowns) => set({ countdowns }),
-  addCountdown: (c) => set((s) => ({ countdowns: [...s.countdowns, c] })),
+  setTheme: (name) => { set({ currentTheme: name }); persistTheme(get()) },
+  setCustomColor: (key, value) => {
+    set((s) => ({ customColors: { ...s.customColors, [key]: value } }))
+    persistTheme(get())
+  },
+  setBgType: (bgType) => { set({ bgType }); persistTheme(get()) },
+  setBgColor: (bgColor) => { set({ bgColor }); persistTheme(get()) },
+  setBgGradient: (bgGradient) => { set({ bgGradient }); persistTheme(get()) },
+  setBgImage: (bgImage) => { set({ bgImage }); persistTheme(get()) },
+  setBgImageSize: (bgImageSize) => { set({ bgImageSize }); persistTheme(get()) },
+  setBgImageBlur: (bgImageBlur) => { set({ bgImageBlur }); persistTheme(get()) },
+  setBgImageX: (bgImageX) => { set({ bgImageX }); persistTheme(get()) },
+  setBgImageY: (bgImageY) => { set({ bgImageY }); persistTheme(get()) },
+  setClockFormat: (clockFormat) => { set({ clockFormat }); persistTheme(get()) },
+  setShowSeconds: (showSeconds) => { set({ showSeconds }); persistTheme(get()) },
+  setShowDate: (showDate) => { set({ showDate }); persistTheme(get()) },
+  setClockSize: (clockSize) => { set({ clockSize }); persistTheme(get()) },
+  setClockColor: (clockColor) => { set({ clockColor }); persistTheme(get()) },
+  setClockFont: (clockFont) => { set({ clockFont }); persistTheme(get()) },
+  setClockPosition: (clockPosition) => { set({ clockPosition }); persistTheme(get()) },
+  setWorldClocks: (worldClocks) => { set({ worldClocks }); persistTheme(get()) },
+  setCountdowns: (countdowns) => { set({ countdowns }); persistTheme(get()) },
+  addCountdown: (c) => {
+    set((s) => ({ countdowns: [...s.countdowns, c] }))
+    persistTheme(get())
+  },
   removeCountdown: (id) =>
-    set((s) => ({ countdowns: s.countdowns.filter((c) => c.id !== id) })),
+    {
+      set((s) => ({ countdowns: s.countdowns.filter((c) => c.id !== id) }))
+      persistTheme(get())
+    },
   hydrate: (data) => set(data)
 }))
