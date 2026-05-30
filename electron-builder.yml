@@ -30,8 +30,8 @@ linux:
   icon: build/icon.png
   category: Utility
 extraResources:
-  - from: build/sensor/sensor.exe
-    to: sensor.exe
+  - from: build/lhm
+    to: lhm
 nsis:
   oneClick: false
   perMachine: false
