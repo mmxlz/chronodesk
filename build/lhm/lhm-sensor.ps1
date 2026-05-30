@@ -85,8 +85,8 @@ try {
         [System.IO.File]::WriteAllText($tempPath, $json, $utf8NoBom)
         Move-Item -Path $tempPath -Destination $OutputPath -Force
 
-        # Poll every 5 seconds (reduces CPU usage)
-        Start-Sleep -Seconds 5
+        # Poll every 2 seconds
+        Start-Sleep -Seconds 2
     }
 } finally {
     $computer.Close()
